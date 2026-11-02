@@ -125,7 +125,7 @@ Get-ChildItem $InstallDir -Recurse -File | Unblock-File
 Step 2 'Writing scripts, passwords and settings'
 Copy-Item "$repo\scripts\*.ps1" "$InstallDir\scripts\" -Force
 Copy-Item "$repo\dashboard\server.mjs" "$InstallDir\dashboard\" -Force
-Copy-Item "$repo\dashboard\public\*" "$InstallDir\dashboard\public\" -Force
+Copy-Item "$repo\dashboard\public\*" "$InstallDir\dashboard\public\" -Recurse -Force
 Copy-Item "$repo\tools" "$InstallDir\" -Recurse -Force
 
 $secretsFile = "$InstallDir\secrets.json"
