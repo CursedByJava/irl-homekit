@@ -11,6 +11,12 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.10] - 2026-11-02
+
+### Fixed
+- The online / LIVE indicator at the top of the dashboard and Studio was cut off on phones. It now always shows in full
+  (checked down to 320 px wide); on narrow phones Studio shows "LIVE · 1,234" instead of "… watching".
+
 ## [1.0.0-beta.9] - 2026-11-02
 
 ### Fixed
@@ -157,7 +163,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.9...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.10...HEAD
+[1.0.0-beta.10]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.9...v1.0.0-beta.10
 [1.0.0-beta.9]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.7...v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.6...v1.0.0-beta.7

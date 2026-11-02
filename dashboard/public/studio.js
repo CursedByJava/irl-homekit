@@ -81,7 +81,8 @@ function render() {
   const live = Object.values(p).filter((x) => x.live);
   const total = live.reduce((a, x) => a + (x.viewers || 0), 0);
   $('viewersPill').className = 'pill' + (live.length ? ' live' : '');
-  $('viewersText').textContent = live.length ? `LIVE · ${total.toLocaleString()} watching` : 'Offline';
+  const vt = $('viewersText'); vt.replaceChildren(live.length ? `LIVE · ${total.toLocaleString()}` : 'Offline');
+  if (live.length) { const w = document.createElement('span'); w.className = 'wide'; w.textContent = ' watching'; vt.append(w); }   // "watching" hides on narrow phones
 
   $('platforms').replaceChildren(...Object.entries(PLATFORM).map(([k, meta]) => {
     const x = p[k] || {};
