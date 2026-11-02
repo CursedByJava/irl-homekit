@@ -219,7 +219,14 @@ if (-not $SkipSystem) {
         # Ask it to close like the X button, so it saves its settings; force it after 20 seconds.
         $irlObs | ForEach-Object { & taskkill.exe /PID $_.Id | Out-Null }
         $t = (Get-Date).AddSeconds(20); while ((Get-Date) -lt $t -and ($irlObs | Where-Object { -not $_.HasExited })) { Start-Sleep 1 }
-        $irlObs | Where-Object { -not $_.HasExited } | Stop-Process -Force -ErrorAction SilentlyContinue
+        # A crashed OBS can be held open by Windows Error Reporting while it writes a crash report; end that too.
+        foreach ($o in $irlObs | Where-Object { -not $_.HasExited }) {
+            Get-CimInstance Win32_Process -Filter "Name='WerFault.exe'" | Where-Object { $_.CommandLine -match "-p $($o.Id)\b" } |
+                ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+            & taskkill.exe /F /T /PID $o.Id | Out-Null
+        }
+        $t = (Get-Date).AddSeconds(10); while ((Get-Date) -lt $t -and ($irlObs | Where-Object { -not $_.HasExited })) { Start-Sleep 1 }
+        if ($irlObs | Where-Object { -not $_.HasExited }) { throw 'The IRL Homekit OBS is stuck and won''t close. Close its window (or restart the PC), then run the installer again.' }
         Info 'closed IRL Homekit'
     }
     if ($oldObs) {
@@ -243,9 +250,24 @@ foreach ($d in $Downloads) {
     if ((Get-FileHash $zip).Hash.ToLower() -ne $d.Sha) { Remove-Item $zip -Force; throw "$($d.Name): checksum mismatch, download refused." }
     $dest = Join-Path $InstallDir $d.Dir
     New-Item -ItemType Directory -Force $dest | Out-Null
-    Expand-Archive $zip $dest -Force
+    # Already unpacked at this exact version (updates): leave it, so nothing in use needs replacing.
+    $marker = Join-Path $dest '.irlhk-version'
+    if ((Test-Path $marker) -and (Get-Content $marker -Raw).Trim() -eq $d.Sha) { Info "$($d.Name): up to date"; continue }
+    try { Expand-Archive $zip $dest -Force }
+    catch {
+        # Some files are in use (e.g. by an OBS that's stuck closing). Fine if what's there already matches the download.
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $z = [IO.Compression.ZipFile]::OpenRead($zip)
+        try {
+            $differs = @($z.Entries | Where-Object { $_.Name } | Where-Object {
+                $f = Join-Path $dest $_.FullName; -not (Test-Path -LiteralPath $f) -or (Get-Item -LiteralPath $f).Length -ne $_.Length })
+        } finally { $z.Dispose() }
+        if ($differs.Count -and -not ($d.Dir -eq 'noalbs')) { throw "$($d.Name): some files are in use and couldn't be updated ($($_.Exception.Message)). Close IRL Homekit or restart the PC, then run the installer again." }
+        Info "$($d.Name): files in use, but already up to date"
+    }
     # NOALBS zips its files inside a versioned folder; flatten it.
     Get-ChildItem $dest -Directory -Filter 'noalbs-v*' | ForEach-Object { Get-ChildItem $_.FullName -Force | Move-Item -Destination $dest -Force; Remove-Item $_.FullName -Force }
+    Write-Utf8 $marker $d.Sha
     Info "$($d.Name): ok"
 }
 # Windows Smart App Control can block programs that don't carry a paid publisher signature, like these open-source
@@ -448,7 +470,9 @@ Info 'dashboard and Studio are panels in the IRL Homekit OBS (Docks menu)'
 Copy-Item "$repo\templates\IRL_Homekit.ovt" "$InstallDir\obs\data\obs-studio\themes\" -Force
 # Multistream plugin, installed into this OBS only.
 New-Item -ItemType Directory -Force "$InstallDir\obs\obs-plugins\64bit", "$InstallDir\obs\data\obs-plugins\obs-multi-rtmp" | Out-Null
-Copy-Item "$InstallDir\_downloads\multi-rtmp\obs-plugins\64bit\obs-multi-rtmp.dll" "$InstallDir\obs\obs-plugins\64bit\" -Force
+$mrDll = "$InstallDir\obs\obs-plugins\64bit\obs-multi-rtmp.dll"; $mrNew = "$InstallDir\_downloads\multi-rtmp\obs-plugins\64bit\obs-multi-rtmp.dll"
+# Skip when it's already this exact file (it may be loaded by an OBS that's stuck closing).
+if (-not (Test-Path $mrDll) -or (Get-FileHash $mrDll).Hash -ne (Get-FileHash $mrNew).Hash) { Copy-Item $mrNew "$InstallDir\obs\obs-plugins\64bit\" -Force }
 Copy-Item "$InstallDir\_downloads\multi-rtmp\data\obs-plugins\obs-multi-rtmp\*" "$InstallDir\obs\data\obs-plugins\obs-multi-rtmp\" -Recurse -Force
 Info 'obs-multi-rtmp plugin installed'
 
