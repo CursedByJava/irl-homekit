@@ -19,7 +19,8 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
    Sign-in options → "only allow Windows Hello sign-in"*).
 3. **OBS stream key**: open **IRL Homekit** (desktop icon) → in its OBS, *Settings → Stream*: check your Twitch key is there.
 4. **Kick / YouTube (optional, free multistream)**: in the IRL Homekit OBS → *Docks → Multiple output* → edit **Kick** / **YouTube**,
-   paste the server + stream key, tick **enabled**. They start and stop together with the main stream.
+   paste the server + stream key, tick **enabled**. Leave *sync start* off: IRL Homekit starts and stops them with the
+   main stream, following the dashboard's **Stream to** switches (switch any platform off to skip it).
 5. **Twitch chat commands (optional)**: https://twitchtokengenerator.com → enable only `chat:read` + `chat:edit` →
    *Generate Token* → authorize → solve the CAPTCHA → Start menu →
    **"IRL Homekit - Twitch chat token"** and paste the Access + Refresh token.

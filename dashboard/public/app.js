@@ -159,15 +159,17 @@ function dashboard() {
     $('fpsDesc').textContent = !fps ? 'What viewers get on Twitch, Kick and YouTube.'
       : locked ? 'Streaming at ' + fps + ' fps. End the stream to change it.'
       : (fps === 60 ? 'Smooth motion. Best on a strong signal.' : 'Easier on a weak signal, a hot phone or a busy PC.');
-    // multistream outputs
+    // where the stream goes
+    const po = s.platformsOut || { list: [] }, primaryName = (po.list.find((p) => p.id === po.primary) || {}).name || 'Twitch';
+    const onList = po.list.filter((p) => p.on && p.ready).map((p) => p.name);
+    $('outputsTag').textContent = st.active ? 'Live on ' + (po.list.filter((p) => p.live).map((p) => p.name).join(' · ') || primaryName) : (onList.join(' · ') || 'Nowhere yet');
     const outs = s.outputs || [];
-    $('outputsTag').textContent = st.active ? (outs.length + ' output' + (outs.length === 1 ? '' : 's') + ' live') : 'Twitch · Kick · YouTube';
-    $('outputs').replaceChildren(...(st.active ? outs.map((o) => {
-      const it = el('div', 'item'); const dot = el('span', 'status-dot ' + (o.reconnecting ? 'warn' : 'ok'));
-      const g = el('div', 'grow'); g.append(el('div', 'title', o.name === 'adv_stream' || o.name === 'simple_stream' ? 'Main stream (Twitch)' : o.name),
-        el('div', 'desc', o.reconnecting ? 'Reconnecting to the platform…' : 'Sending'));
-      it.append(dot, g); return it;
+    $('outputs').replaceChildren(...(st.active ? outs.filter((o) => o.reconnecting).map((o) => {
+      const it = el('div', 'item'); const g = el('div', 'grow');
+      g.append(el('div', 'title', o.name === 'adv_stream' || o.name === 'simple_stream' ? primaryName + ' (main stream)' : o.name), el('div', 'desc', 'Reconnecting to the platform…'));
+      it.append(el('span', 'status-dot warn'), g); return it;
     }) : []));
+    renderPlatforms(po, st.active);
     // preview
     const img = $('previewImg');
     if (on && s.previewAt) { img.src = '/preview.jpg?t=' + s.previewAt; $('previewEmpty').hidden = true; img.hidden = false; }
@@ -177,6 +179,31 @@ function dashboard() {
     $('recBtn').textContent = s.record.active ? 'Stop recording' : 'Start recording';
     $('recBtn').disabled = !on;
     $('recDesc').textContent = s.record.active ? 'Recording for ' + fmtDur(s.record.duration) + ' on the home PC.' : 'Saves a local copy on the home PC.';
+  }
+
+  let platKey = '';
+  function renderPlatforms(po, live) {
+    const key = JSON.stringify(po) + live; if (key === platKey) return; platKey = key;
+    $('platforms').replaceChildren(...po.list.map((p) => {
+      const it = el('div', 'item'), g = el('div', 'grow'), d = el('div', 'desc');
+      if (!p.ready) d.textContent = 'No stream key yet. Add it on the PC in the IRL Homekit OBS (' + (p.id === 'twitch' ? 'Settings > Stream' : 'Docks > Multiple output') + ').';
+      else if (p.live) { d.append(el('span', 'live-now', 'Live now')); if (p.id === po.primary) d.append(' · main stream'); }
+      else if (!p.on) d.textContent = live ? 'Off. Switch on to add it to this stream.' : 'Off: won\'t go live.';
+      else d.textContent = live ? 'Starting…' : 'Goes live when you start the stream.';
+      if (live && p.id === 'twitch' && !p.live && p.ready) d.textContent = p.on ? 'Goes live next stream.' : 'Off. Twitch can be switched on before you go live.';
+      g.append(el('div', 'title', p.name), d);
+      const t = el('button', 'toggle' + (p.on ? '' : ' muted'), p.on ? 'On' : 'Off');
+      t.setAttribute('aria-pressed', String(p.on)); t.setAttribute('aria-label', 'Stream to ' + p.name);
+      t.disabled = !p.ready;
+      t.onclick = async () => {
+        if (p.on && p.live && p.id !== po.primary) {
+          const yes = await confirmBox('Stop streaming to ' + p.name + '?', 'Viewers on ' + p.name + ' see the stream end. Your other platforms keep going.', 'Stop ' + p.name, 'Keep it on');
+          if (!yes) return;
+        }
+        act({ action: 'setPlatform', platform: p.id, on: !p.on }, p.name + (p.on ? ' off.' : ' on.'));
+      };
+      it.append(g, t); return it;
+    }));
   }
 
   let sceneKey = '';

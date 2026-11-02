@@ -328,6 +328,7 @@ $settings = [ordered]@{
     phoneInputs = @('IRL Phone (Bonded)', 'IRL Phone (Backup)'); overlayInputs = @($OverlaySources); audioInputs = $audio
     autoScenes = @('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)')
     studioDomain = $studioDomain; duckdnsName = $DuckDnsName; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
+    streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true } })   # dashboard's "Stream to" switches
 }
 Write-Utf8 "$InstallDir\settings.json" ($settings | ConvertTo-Json -Depth 5)
 
@@ -450,6 +451,11 @@ ChannelSetup=Stereo
 }
 $mr = "$profDir\obs-multi-rtmp.json"
 if (-not (Test-Path $mr)) { Copy-Item "$repo\templates\obs-multi-rtmp.json" $mr }
+# IRL Homekit starts Kick / YouTube itself, following the dashboard's "Stream to" switches, so the plugin must not
+# start them on its own with the main stream (OBS is closed here, so this edit sticks).
+$mrCfg = Get-Content $mr -Raw | ConvertFrom-Json
+foreach ($t in @($mrCfg.targets)) { $t.'sync-start' = $false; $t.'sync-stop' = $false; if ($t.'service-param'.key) { $t.enabled = $true } }
+Write-Utf8 $mr ($mrCfg | ConvertTo-Json -Depth 10)
 
 & "$repo\scripts\New-IRLScenes.ps1" -Name $ObsName -BaseCollection $BaseCollection -ObsConfigDir $ObsConfigDir -BaseConfigDir $BaseObsConfigDir `
     -OverlayDir "$InstallDir\overlays" -OverlaySources $OverlaySources -BrbBackground $BrbBackground -Force

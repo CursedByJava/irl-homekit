@@ -6,9 +6,9 @@
       "protocol": "RTMP",
       "service-param": { "server": "", "key": "", "use_auth": false },
       "output-param": {},
-      "sync-start": true,
-      "sync-stop": true,
-      "enabled": false
+      "sync-start": false,
+      "sync-stop": false,
+      "enabled": true
     },
     {
       "id": "1002",
@@ -16,9 +16,9 @@
       "protocol": "RTMP",
       "service-param": { "server": "rtmp://a.rtmp.youtube.com/live2", "key": "", "use_auth": false },
       "output-param": {},
-      "sync-start": true,
-      "sync-stop": true,
-      "enabled": false
+      "sync-start": false,
+      "sync-stop": false,
+      "enabled": true
     }
   ],
   "video_configs": [],

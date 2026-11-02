@@ -237,6 +237,12 @@ main { padding: 20px 16px 48px; display: grid; gap: 20px; max-width: 1120px; mar
 .status-dot.bad { background: var(--red); box-shadow: 0 0 0 4px var(--red-tint); }
 .status-dot.warn { background: var(--orange); box-shadow: 0 0 0 4px var(--orange-tint); }
 
+.platforms-head { margin-top: 18px; }
+.platforms-head .title { font-weight: 600; font-size: 17px; }
+.platforms-head .desc { color: var(--label-2); font-size: 14px; margin-top: 2px; }
+.toggle:disabled { opacity: .4; cursor: not-allowed; }
+.desc .live-now { color: var(--red); font-weight: 600; }
+
 /* iOS switch (mute toggles: green = sound on) */
 .toggle {
   position: relative; flex: none; width: 51px; height: 31px; border-radius: 999px; background: var(--green);

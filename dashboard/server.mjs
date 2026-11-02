@@ -43,10 +43,11 @@ class Obs {
   sha(s) { return crypto.createHash('sha256').update(s).digest('base64'); }
   onMessage(m) {
     if (m.op === 0) {
-      const d = { rpcVersion: 1, eventSubscriptions: 0 };
+      const d = { rpcVersion: 1, eventSubscriptions: 64 };   // Outputs events: stream started / stopped
       if (m.d.authentication) d.authentication = this.sha(this.sha(this.password + m.d.authentication.salt) + m.d.authentication.challenge);
       this.ws.send(JSON.stringify({ op: 1, d }));
-    } else if (m.op === 2) { this.ready = true; log('OBS connected'); }
+    } else if (m.op === 2) { this.ready = true; log('OBS connected'); this.onReady?.(); }
+    else if (m.op === 5) { this.onEvent?.(m.d.eventType, m.d.eventData || {}); }
     else if (m.op === 7) {
       const p = this.pending.get(m.d.requestId); if (!p) return; this.pending.delete(m.d.requestId);
       if (m.d.requestStatus.result) p.resolve(m.d.responseData || {}); else p.reject(new Error(m.d.requestStatus.comment || `code ${m.d.requestStatus.code}`));
@@ -71,6 +72,84 @@ const state = {
   meta: { autoScenes: settings.autoScenes || [], audioInputs: settings.audioInputs || {}, baseCollection: settings.baseCollection || '' },
 };
 let preview = null; let previewAt = 0;
+
+// ---------------------------------------------------------------- where the stream goes (Twitch / Kick / YouTube switches)
+// OBS's main stream output goes to the first platform that's switched on (Twitch, else Kick, else YouTube), so every
+// way of starting the stream (dashboard, the OBS button, !start in chat) respects the switches. The other platforms
+// that are on are started through obs-multi-rtmp's per-target hotkeys when the main stream starts, and stopped with
+// it; platforms that are off are never started (no stray "went live" notifications). Their own auto-start
+// ("sync-start") is switched off by the installer, so IRL Homekit decides.
+const PLATFORMS = ['twitch', 'kick', 'youtube'];
+const PLATFORM_NAMES = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' };
+const profileDir = () => path.join(settings.obsConfigDir || '', 'basic', 'profiles', String(settings.obsProfile || 'IRL Homekit').replace(/[^A-Za-z0-9_-]/g, '_'));
+settings.streamTo = { twitch: true, kick: true, youtube: true, ...(settings.streamTo || {}) };
+const extraLive = new Set();   // multi-rtmp targets IRL Homekit started for the current stream
+
+function saveSettings() {
+  const file = path.join(ROOT, 'settings.json');
+  const disk = readJson(file); disk.streamTo = settings.streamTo;   // only touch our key; the installer owns the rest
+  fs.writeFileSync(file, JSON.stringify(disk, null, 2));
+}
+// Stream keys/servers: Twitch from the profile's main stream settings (remembered in secrets.json, since the main
+// output may later point at Kick or YouTube), Kick and YouTube from obs-multi-rtmp's targets.
+function endpoints() {
+  const ep = {};
+  try {
+    const svc = readJson(path.join(profileDir(), 'service.json'));
+    if (svc.type === 'rtmp_common' && /twitch/i.test(svc.settings?.service || '') && svc.settings?.key && secrets.streamTwitch?.key !== svc.settings.key) {
+      saveSecrets({ streamTwitch: { type: svc.type, settings: svc.settings } });
+    }
+  } catch { }
+  if (secrets.streamTwitch?.settings?.key) ep.twitch = { main: { type: secrets.streamTwitch.type, settings: secrets.streamTwitch.settings } };
+  try {
+    for (const t of readJson(path.join(profileDir(), 'obs-multi-rtmp.json')).targets || []) {
+      const p = PLATFORMS.find((x) => new RegExp(PLATFORM_NAMES[x], 'i').test(t.name || ''));
+      if (p && p !== 'twitch' && t['service-param']?.key) {
+        ep[p] = { id: t.id, main: { type: 'rtmp_custom', settings: { server: t['service-param'].server, key: t['service-param'].key, use_auth: false } } };
+      }
+    }
+  } catch { }
+  return ep;
+}
+function primaryPlatform(ep = endpoints()) { return PLATFORMS.find((p) => settings.streamTo[p] && ep[p]) || null; }
+function platformState() {
+  const ep = endpoints(), primary = primaryPlatform(ep);
+  state.platformsOut = { primary, list: PLATFORMS.map((p) => ({ id: p, name: PLATFORM_NAMES[p], on: !!settings.streamTo[p], ready: !!ep[p],
+    live: !!state.stream?.active && (p === primary || extraLive.has(p)) })) };
+}
+// Point OBS's main output at the first platform that's on. Only possible while not streaming.
+async function applyMainOutput() {
+  if (!obs.ready) return;
+  const ep = endpoints(), primary = primaryPlatform(ep);
+  if (!primary) return;
+  const cur = await obs.req('GetStreamServiceSettings').catch(() => null);
+  if (!cur || (await obs.req('GetStreamStatus')).outputActive) return;
+  const want = ep[primary].main;
+  if (cur.streamServiceType === want.type && cur.streamServiceSettings?.key === want.settings.key) return;
+  await obs.req('SetStreamServiceSettings', { streamServiceType: want.type, streamServiceSettings: want.settings });
+  log('main stream output now goes to', PLATFORM_NAMES[primary]);
+}
+async function startExtras() {
+  const ep = endpoints(), primary = primaryPlatform(ep);
+  for (const p of ['kick', 'youtube']) {
+    if (p === primary || !settings.streamTo[p] || !ep[p] || extraLive.has(p)) continue;
+    await obs.req('TriggerHotkeyByName', { hotkeyName: `obs-multi-rtmp.start.${ep[p].id}` }).then(() => { extraLive.add(p); log('started', PLATFORM_NAMES[p]); }, (e) => log('could not start', p, e.message));
+  }
+}
+async function stopExtra(p) {
+  const ep = endpoints(); if (!ep[p]) return;
+  await obs.req('TriggerHotkeyByName', { hotkeyName: `obs-multi-rtmp.stop.${ep[p].id}` }).catch(() => {});
+  extraLive.delete(p); log('stopped', PLATFORM_NAMES[p]);
+}
+obs.onReady = () => { applyMainOutput().catch((e) => log('main output', e.message)); };
+obs.onEvent = (type, d) => {
+  if (type !== 'StreamStateChanged') return;
+  if (d.outputState === 'OBS_WEBSOCKET_OUTPUT_STARTED') startExtras().catch((e) => log('extras', e.message));
+  if (d.outputState === 'OBS_WEBSOCKET_OUTPUT_STOPPED') {
+    for (const p of [...extraLive]) stopExtra(p);
+    applyMainOutput().catch(() => {});   // switches changed while live take effect for the next stream
+  }
+};
 
 // go-irl stats (only sent while a stream is coming in)
 let goirlLast = 0; const linkPrev = new Map();
@@ -135,6 +214,8 @@ async function pollObs() {
     state.stats = { cpu: +stats.cpuUsage.toFixed(1), fps: +stats.activeFps.toFixed(1), renderSkipped: stats.renderSkippedFrames,
       outputSkipped: stats.outputSkippedFrames, memory: Math.round(stats.memoryUsage) };
     state.outputs = stream.outputActive ? [{ name: 'adv_stream', kind: 'rtmp_output', reconnecting: stream.outputReconnecting }] : [];
+    if (!stream.outputActive && extraLive.size) extraLive.clear();
+    platformState();
   } catch (e) { /* OBS busy or reconnecting */ }
 }
 
@@ -598,6 +679,28 @@ async function action(body) {
       await obs.req('SetVideoSettings', { fpsNumerator: fps, fpsDenominator: 1 });
       state.video.fps = fps;
       return {};
+    }
+    case 'setPlatform': {
+      const p = body.platform, on = !!body.on, name = PLATFORM_NAMES[p];
+      if (!name) throw new Error('unknown platform');
+      const ep = endpoints();
+      if (on && !ep[p]) throw new Error(`${name} has no stream key yet. Add it on the PC in the IRL Homekit OBS: ${p === 'twitch' ? 'Settings > Stream' : 'Docks > Multiple output > ' + name}.`);
+      if (!on && !PLATFORMS.some((x) => x !== p && settings.streamTo[x] && ep[x])) throw new Error('Keep at least one platform on, or the stream has nowhere to go.');
+      const live = (await obs.req('GetStreamStatus')).outputActive;
+      if (live) {
+        const primary = primaryPlatform(ep);
+        if (p === primary && !on) throw new Error(`${name} carries the main stream right now. End the stream to turn it off.`);
+        if (p === 'twitch' && on) throw new Error('Twitch can only be added before you go live. It will be on for the next stream.');
+        settings.streamTo[p] = on; saveSettings();
+        if (on) await startExtras(); else await stopExtra(p);
+        platformState();
+        return { note: on ? `${name} is going live now.` : `${name} stopped. The other platforms keep streaming.` };
+      }
+      settings.streamTo[p] = on; saveSettings();
+      await applyMainOutput();
+      platformState();
+      const list = PLATFORMS.filter((x) => settings.streamTo[x] && ep[x]).map((x) => PLATFORM_NAMES[x]);
+      return { note: `Next stream goes to ${list.join(', ')}.` };
     }
     case 'installUpdate': {
       if (!state.update) throw new Error('IRL Homekit is already up to date');

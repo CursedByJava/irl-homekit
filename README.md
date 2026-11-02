@@ -38,7 +38,7 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Bonded cellular + Wi-Fi ingest (SRTLA) | [go-irl](https://github.com/e04/go-irl) |
 | ✅ | Backup SRT / RTMP ingest | [MediaMTX](https://github.com/bluenviron/mediamtx), password protected |
 | ✅ | Auto LIVE / LOW / BRB scenes, `!bitrate` `!start` `!stop` chat commands | [NOALBS](https://github.com/NOALBS/nginx-obs-automatic-low-bitrate-switching) |
-| ✅ | Multistream Twitch + Kick + YouTube without Restream | [obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp) |
+| ✅ | Multistream Twitch + Kick + YouTube without Restream, each switchable on the dashboard | [obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp) |
 | ✅ | Remote control page with live signal, preview, start/stop, scenes, mute | `dashboard/` (Node, no dependencies) |
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
 | ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" warning (small, bottom-left) | `overlays/` (OBS browser sources) |
@@ -182,6 +182,8 @@ One login opens both the dashboard and Studio.
 `https://your-domain` (or `http://localhost:8090` on the PC). Mobile-first and readable outdoors:
 
 - **Phone signal:** bitrate, latency, packet loss, each bonded link, which input is active, in plain words ("Weak: viewers see the LOW SIGNAL banner")
+- **Stream to:** switch Twitch, Kick and YouTube on or off. Off means it never goes live there (no stray notifications);
+  Kick and YouTube can be added or dropped mid-stream.
 - **Stream:** live preview, uptime, outgoing bitrate, dropped frames, live outputs, Start/End with confirmation,
   one-tap 60 / 30 fps switch (while offline)
 - **Scenes:** one tap; auto-switched scenes are labelled
