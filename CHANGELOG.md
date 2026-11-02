@@ -11,6 +11,12 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.11] - 2026-11-02
+
+### Fixed
+- The Sign out button could be cut off at the top of the dashboard and Studio. Nothing in the top bar shrinks or gets cut
+  off any more: if it doesn't fit (narrow phones, larger text, the panel inside OBS), the bar scrolls sideways.
+
 ## [1.0.0-beta.10] - 2026-11-02
 
 ### Fixed
@@ -163,7 +169,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.10...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.11...HEAD
+[1.0.0-beta.11]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.10...v1.0.0-beta.11
 [1.0.0-beta.10]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.9...v1.0.0-beta.10
 [1.0.0-beta.9]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.7...v1.0.0-beta.8
