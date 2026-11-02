@@ -27,6 +27,7 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Multistream Twitch + Kick + YouTube without Restream | [obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp) |
 | ✅ | Remote control page with live signal, preview, start/stop, scenes, mute | `dashboard/` (Node, no dependencies) |
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
+| ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" banner | `overlays/` (OBS browser sources) |
 | ✅ | Free HTTPS on your own domain | [Caddy](https://caddyserver.com) + Let's Encrypt |
 | ✅ | Runs 24/7, restarts anything that crashes, survives reboots | watchdog + logon task |
 

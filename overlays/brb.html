@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Be right back</title>
+  <link rel="stylesheet" href="screen.css">
+  <style>:root { --a: #ff2d55; --b: #5e5ce6; --c: #bf5af2; --d: #07060f; }</style>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="mesh"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+  <main class="stage">
+    <div class="stack">
+      <svg class="glyph" viewBox="0 0 512 512" aria-hidden="true">
+        <g fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round">
+          <path class="wave" d="M329.5 194.3 A96 96 0 0 1 329.5 317.7"/><path class="wave" d="M182.5 317.7 A96 96 0 0 1 182.5 194.3"/>
+          <path class="wave w2" d="M375.5 155.7 A156 156 0 0 1 375.5 356.3"/><path class="wave w2" d="M136.5 356.3 A156 156 0 0 1 136.5 155.7"/>
+        </g>
+        <circle cx="256" cy="256" r="38" fill="#fff"/>
+      </svg>
+      <h1 class="title" id="title">Be right back</h1>
+      <p class="sub"><span id="sub">Signal dropped, reconnecting</span><span class="dots"><i></i><i></i><i></i></span></p>
+    </div>
+  </main>
+  <footer class="footer">
+    <span class="chip"><span class="live"></span><span id="channel"></span></span>
+    <span class="chip clock" id="clock"></span>
+  </footer>
+  <script src="screen.js"></script>
+</body>
+</html>

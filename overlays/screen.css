@@ -1,0 +1,65 @@
+/* Shared look for the IRL Homekit full-screen scenes (1920x1080 OBS browser sources). */
+@font-face {
+  font-family: 'Inter';
+  src: url('../dashboard/public/fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: block;
+}
+:root { --a: #ff2d55; --b: #5e5ce6; --c: #ff9f0a; --d: #0a0a12; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--d); color: #fff; }
+body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss03'; }
+
+/* animated mesh: big blurred colour blobs drifting on slow, offset loops */
+.mesh { position: absolute; inset: -20%; filter: blur(120px) saturate(140%); opacity: .9; }
+.blob { position: absolute; width: 52vmax; height: 52vmax; border-radius: 50%; mix-blend-mode: screen; will-change: transform; }
+.blob.b1 { background: radial-gradient(circle at 30% 30%, var(--a), transparent 62%); top: 5%; left: 0%; animation: drift1 26s ease-in-out infinite; }
+.blob.b2 { background: radial-gradient(circle at 60% 40%, var(--b), transparent 62%); top: 25%; left: 45%; animation: drift2 32s ease-in-out infinite; }
+.blob.b3 { background: radial-gradient(circle at 50% 50%, var(--c), transparent 60%); top: 50%; left: 15%; animation: drift3 38s ease-in-out infinite; }
+.blob.b4 { background: radial-gradient(circle at 50% 50%, var(--b), transparent 60%); top: -10%; left: 60%; animation: drift1 44s ease-in-out infinite reverse; opacity: .7; }
+@keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(18vw,10vh) scale(1.15); } 66% { transform: translate(-8vw,18vh) scale(.9); } }
+@keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1.05); } 40% { transform: translate(-22vw,-8vh) scale(.88); } 75% { transform: translate(6vw,14vh) scale(1.2); } }
+@keyframes drift3 { 0%,100% { transform: translate(0,0) scale(.95); } 30% { transform: translate(20vw,-16vh) scale(1.1); } 70% { transform: translate(30vw,4vh) scale(.92); } }
+
+/* film grain + vignette for depth */
+.grain { position: absolute; inset: 0; opacity: .08; mix-blend-mode: overlay; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 1s steps(4) infinite; }
+@keyframes grain { 0% { transform: translate(0,0); } 25% { transform: translate(-3%,2%); } 50% { transform: translate(2%,-3%); } 75% { transform: translate(-2%,-1%); } 100% { transform: translate(0,0); } }
+.vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.55) 100%); pointer-events: none; }
+
+/* night-sky mode: canvas stars over a deep gradient; the colour mesh becomes a soft aurora */
+.stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+body.bg-stars { background: radial-gradient(ellipse at 50% 120%, #1a1240 0%, #0b0a1f 45%, #04040b 100%); }
+body.bg-stars .mesh { opacity: .38; filter: blur(140px) saturate(130%); }
+body.bg-stars .grain { opacity: .05; }
+/* GIF / video background */
+.bg-media-el { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+body.bg-media .mesh { opacity: .25; }
+body.bg-media .vignette { background: radial-gradient(ellipse at center, rgba(0,0,0,.15) 30%, rgba(0,0,0,.7) 100%); }
+
+/* content */
+.stage { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+.stack { display: grid; justify-items: center; gap: 28px; animation: rise 1.2s cubic-bezier(.2,.8,.2,1) both; }
+.glyph { width: 168px; height: 168px; filter: drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+.title { font-size: 168px; font-weight: 800; letter-spacing: -0.045em; line-height: .95; text-shadow: 0 8px 40px rgba(0,0,0,.35); }
+.sub { font-size: 40px; font-weight: 500; letter-spacing: -0.015em; color: rgba(255,255,255,.78); display: inline-flex; align-items: center; gap: 18px; }
+.dots { display: inline-flex; gap: 10px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: #fff; opacity: .3; animation: dot 1.4s ease-in-out infinite; }
+.dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes dot { 0%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-6px); } }
+@keyframes rise { from { opacity: 0; transform: translateY(30px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* frosted footer: channel name + clock */
+.footer { position: absolute; left: 64px; right: 64px; bottom: 56px; display: flex; justify-content: space-between; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 14px; padding: 16px 26px; border-radius: 999px; font-size: 28px; font-weight: 600; letter-spacing: -0.01em;
+  background: rgba(255,255,255,.10); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.chip .live { width: 14px; height: 14px; border-radius: 50%; background: var(--a); box-shadow: 0 0 0 6px color-mix(in srgb, var(--a) 30%, transparent); animation: pulse 1.8s ease-in-out infinite; }
+.clock { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.75); opacity: .5; } }
+
+/* radio-wave glyph animation */
+.wave { transform-origin: 50% 50%; animation: wave 2.4s ease-in-out infinite; }
+.wave.w2 { animation-delay: .3s; }
+@keyframes wave { 0%,100% { opacity: .35; } 50% { opacity: 1; } }

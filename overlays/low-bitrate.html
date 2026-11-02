@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Low bitrate overlay</title>
+  <script src="config.js"></script>
+  <style>
+    @font-face { font-family: 'Inter'; src: url('../dashboard/public/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    body { font-family: 'Inter', system-ui, sans-serif; color: #fff; -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss03'; }
+    /* soft top fade so the banner reads on any picture */
+    .scrim { position: absolute; left: 0; right: 0; top: 0; height: 260px; background: linear-gradient(180deg, rgba(0,0,0,.45), transparent); }
+    .wrap { position: absolute; top: 56px; left: 0; right: 0; display: flex; justify-content: center; transform: scale(1.28); transform-origin: 50% 0; }
+    .banner {
+      display: flex; align-items: center; gap: 22px; padding: 18px 30px 18px 22px; border-radius: 999px;
+      background: rgba(20, 20, 24, .58); backdrop-filter: blur(28px) saturate(170%); -webkit-backdrop-filter: blur(28px) saturate(170%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 18px 50px rgba(0,0,0,.35);
+      animation: in .7s cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes in { from { opacity: 0; transform: translateY(-40px) scale(.96); } to { opacity: 1; transform: none; } }
+    .icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,159,10,.18); }
+    .bars { display: flex; align-items: flex-end; gap: 5px; height: 30px; }
+    .bars i { width: 7px; border-radius: 3px; background: rgba(255,255,255,.22); }
+    .bars i:nth-child(1) { height: 25%; } .bars i:nth-child(2) { height: 50%; } .bars i:nth-child(3) { height: 75%; } .bars i:nth-child(4) { height: 100%; }
+    .bars i.on { background: #ff9f0a; animation: blink 1.2s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+    .text { display: grid; gap: 2px; }
+    .title { font-size: 36px; font-weight: 750; letter-spacing: -0.025em; line-height: 1.1; display: flex; align-items: baseline; gap: 6px; }
+    .dots i { display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: #fff; opacity: .3; animation: dot 1.4s ease-in-out infinite; }
+    .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+    @keyframes dot { 0%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+    .sub { font-size: 24px; font-weight: 500; color: rgba(255,255,255,.72); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+    .kbps { color: #ffb340; font-weight: 650; }
+  </style>
+</head>
+<body>
+  <div class="scrim"></div>
+  <div class="wrap">
+    <div class="banner" role="status">
+      <div class="icon"><div class="bars" id="bars"><i class="on"></i><i></i><i></i><i></i></div></div>
+      <div class="text">
+        <div class="title"><span id="title">Low bitrate</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="sub" id="sub">Weak signal, hang tight</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Shows the live bitrate from go-irl (bonded feed) when available; otherwise a generic message.
+    (function () {
+      const cfg = window.IRLHK || {};
+      const q = new URLSearchParams(location.search);
+      if (q.get('title')) document.getElementById('title').textContent = q.get('title');
+      const sub = document.getElementById('sub'), bars = [...document.querySelectorAll('#bars i')];
+      let last = 0;
+      function show(kbps) {
+        last = Date.now();
+        const lit = kbps < 400 ? 1 : kbps < 800 ? 2 : kbps < 1500 ? 3 : 4;
+        bars.forEach((b, i) => b.classList.toggle('on', i < lit));
+        sub.innerHTML = `<span class="kbps">${kbps.toLocaleString()} kbps</span> · hang tight, it'll clear up`;
+      }
+      setInterval(() => { if (Date.now() - last > 4000) { sub.textContent = 'Weak signal, hang tight'; bars.forEach((b, i) => b.classList.toggle('on', i === 0)); } }, 1000);
+      function connect() {
+        let ws; try { ws = new WebSocket(cfg.goirlWs || 'ws://127.0.0.1:8888/ws'); } catch { return setTimeout(connect, 5000); }
+        ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'reader' && m.stats) show(Math.round((m.stats.Instantaneous?.MbpsRecvRate || 0) * 1000)); } catch {} };
+        ws.onclose = () => setTimeout(connect, 3000);
+        ws.onerror = () => {};
+      }
+      connect();
+    })();
+  </script>
+</body>
+</html>

@@ -127,6 +127,11 @@ Copy-Item "$repo\scripts\*.ps1" "$InstallDir\scripts\" -Force
 Copy-Item "$repo\dashboard\server.mjs" "$InstallDir\dashboard\" -Force
 Copy-Item "$repo\dashboard\public\*" "$InstallDir\dashboard\public\" -Recurse -Force
 Copy-Item "$repo\tools" "$InstallDir\" -Recurse -Force
+# Animated Starting Soon / BRB screens and the low-bitrate banner; keep the user's own config.js on re-runs.
+$hadOverlayCfg = Test-Path "$InstallDir\overlays\config.js"
+New-Item -ItemType Directory -Force "$InstallDir\overlays" | Out-Null
+Get-ChildItem "$repo\overlays" -File | Where-Object { $_.Name -ne 'config.js' -or -not $hadOverlayCfg } | Copy-Item -Destination "$InstallDir\overlays\" -Force
+if (-not $hadOverlayCfg) { Write-Utf8 "$InstallDir\overlays\config.js" ([IO.File]::ReadAllText("$repo\overlays\config.js").Replace("channel: ''", "channel: '$($TwitchChannel -replace "'", '')'")) }
 
 $secretsFile = "$InstallDir\secrets.json"
 $s = if (Test-Path $secretsFile) { Get-Content $secretsFile -Raw | ConvertFrom-Json } else { [pscustomobject]@{} }
@@ -263,7 +268,7 @@ ChannelSetup=Stereo
 $mr = "$profDir\obs-multi-rtmp.json"
 if (-not (Test-Path $mr)) { Copy-Item "$repo\templates\obs-multi-rtmp.json" $mr }
 
-& "$repo\scripts\New-IRLScenes.ps1" -Name $ObsName -BaseCollection $BaseCollection -ObsConfigDir $ObsConfigDir `
+& "$repo\scripts\New-IRLScenes.ps1" -Name $ObsName -BaseCollection $BaseCollection -ObsConfigDir $ObsConfigDir -OverlayDir "$InstallDir\overlays" `
     -OverlaySources $OverlaySources -BrbBackground $BrbBackground -Force
 
 $wsCfg = Join-Path $ObsConfigDir 'plugin_config\obs-websocket\config.json'

@@ -9,8 +9,10 @@ param(
     [int] $Height = 1080,
     # Sources from the base collection to show on top of the IRL scenes (chat, alerts, ...), in that order.
     [string[]] $OverlaySources = @(),
-    # A media/image source from the base collection to use as the BRB background (else a dark color fills it).
+    # A media/image source from the base collection to use as the BRB background (else the animated BRB screen).
     [string] $BrbBackground = '',
+    # Folder with the animated screens (brb.html, starting.html, low-bitrate.html).
+    [string] $OverlayDir = (Join-Path (Split-Path $PSScriptRoot -Parent) 'overlays'),
     [switch] $Force
 )
 $ErrorActionPreference = 'Stop'
@@ -94,30 +96,39 @@ $brbText = New-Source 'IRL BRB Text' 'text_gdiplus' 'text_gdiplus_v3' @{ text = 
     outline = $true; outline_size = 8; outline_color = 4278190080 } 0
 $brbSub = New-Source 'IRL BRB Subtext' 'text_gdiplus' 'text_gdiplus_v3' @{ text = 'Signal dropped - reconnecting...'; font = (& $font 64); align = 'center'
     outline = $true; outline_size = 5; outline_color = 4278190080 } 0
-$lowText = New-Source 'IRL Low Signal Banner' 'text_gdiplus' 'text_gdiplus_v3' @{ text = '  LOW SIGNAL - hang tight  '; font = (& $font 48); align = 'center'
-    bk_color = 4278190080; bk_opacity = 65 } 0
-$newSources = @($bonded, $backup, $brbText, $brbSub, $lowText)
+# Animated full-screen scenes and the low-bitrate banner (local HTML pages rendered by OBS's browser source).
+$overlayPath = { param($f) ((Resolve-Path (Join-Path $OverlayDir $f)).Path -replace '\\', '/') }
+$page = { param($srcName, $file) New-Source $srcName 'browser_source' 'browser_source' @{ is_local_file = $true; local_file = (& $overlayPath $file)
+    width = $Width; height = $Height; fps = 60; fps_custom = $true; css = ''; shutdown = $false; restart_when_active = $false; reroute_audio = $false } 0 }
+$brbScreen = & $page 'IRL BRB Screen' 'brb.html'
+$startScreen = & $page 'IRL Starting Soon Screen' 'starting.html'
+$lowOverlay = & $page 'IRL Low Bitrate Overlay' 'low-bitrate.html'
+$newSources = @($bonded, $backup, $brbScreen, $startScreen, $lowOverlay)
 
-if ($BrbBackground) { $brbBg = Use-Existing $BrbBackground 0 } else { $brbBg = $null }
-if (-not $brbBg) {
-    $bgSrc = New-Source 'IRL BRB Background' 'color_source' 'color_source_v3' @{ color = 4280163870; width = $Width; height = $Height } 0
-    $newSources += $bgSrc
-    $brbBg = New-SceneItem $bgSrc 0 @{}
+# BRB: the animated screen by default; or your own media source behind simple text if you pass -BrbBackground.
+$brbItems = @()
+if ($BrbBackground) { $brbBg = Use-Existing $BrbBackground 0 }
+if ($BrbBackground -and $brbBg) {
+    $newSources += @($brbText, $brbSub)
+    $brbItems = @($brbBg, (New-SceneItem $brbText 0 (& $center ($Height * 0.435))), (New-SceneItem $brbSub 0 (& $center ($Height * 0.575))))
+} else {
+    $brbItems = @((New-SceneItem $brbScreen 0 @{}))
 }
 $overlays = { @($OverlaySources | ForEach-Object { Use-Existing $_ 0 }) }
 
 $live = New-Scene 'IRL LIVE' (@((New-SceneItem $bonded 0 $fullFrame)) + (& $overlays))
-$low = New-Scene 'IRL LOW' (@((New-SceneItem $bonded 0 $fullFrame)) + (& $overlays) + @((New-SceneItem $lowText 0 (& $center 60))))
+$low = New-Scene 'IRL LOW' (@((New-SceneItem $bonded 0 $fullFrame), (New-SceneItem $lowOverlay 0 @{})) + (& $overlays))
 $liveB = New-Scene 'IRL LIVE (Backup)' (@((New-SceneItem $backup 0 $fullFrame)) + (& $overlays))
-$lowB = New-Scene 'IRL LOW (Backup)' (@((New-SceneItem $backup 0 $fullFrame)) + (& $overlays) + @((New-SceneItem $lowText 0 (& $center 60))))
-$brb = New-Scene 'IRL BRB' (@($brbBg, (New-SceneItem $brbText 0 (& $center ($Height * 0.435))), (New-SceneItem $brbSub 0 (& $center ($Height * 0.575)))) + (& $overlays))
+$lowB = New-Scene 'IRL LOW (Backup)' (@((New-SceneItem $backup 0 $fullFrame), (New-SceneItem $lowOverlay 0 @{})) + (& $overlays))
+$brb = New-Scene 'IRL BRB' ($brbItems + (& $overlays))
+$starting = New-Scene 'IRL Starting Soon' (@((New-SceneItem $startScreen 0 @{})) + (& $overlays))
 
 # Free capture cards while their scenes are not on screen (the PC may also be used for desktop streams).
 foreach ($s in $j.sources | Where-Object id -eq 'dshow_input') { $s.settings | Add-Member -Force deactivate_when_not_showing $true }
 
-$j.sources = @($j.sources) + $newSources + @($live, $low, $brb, $liveB, $lowB)
+$j.sources = @($j.sources) + $newSources + @($starting, $live, $low, $brb, $liveB, $lowB)
 $existing = @($j.scene_order | ForEach-Object name)
-$j.scene_order = @(@('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)') + $existing | ForEach-Object { [pscustomobject]@{ name = $_ } })
+$j.scene_order = @(@('IRL Starting Soon', 'IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)') + $existing | ForEach-Object { [pscustomobject]@{ name = $_ } })
 $j.current_scene = 'IRL BRB'; $j.current_program_scene = 'IRL BRB'
 
 $json = $j | ConvertTo-Json -Depth 100
