@@ -4,6 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import dns from 'node:dns/promises';
 import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -233,6 +234,25 @@ async function checkForUpdate() {
   } catch (e) { log('update check failed:', e.message); }
 }
 setInterval(checkForUpdate, 6 * 3600e3); setTimeout(checkForUpdate, 20000);
+
+// ---------------------------------------------------------------- remote access health (same checks as Setup-RemoteDashboard.ps1)
+async function checkRemote() {
+  if (!settings.domain) { state.remote = { domain: '' }; return; }
+  const names = [settings.domain, settings.studioDomain].filter(Boolean);
+  const r = { domain: settings.domain, studio: settings.studioDomain, ok: true, problem: '' };
+  try {
+    const ip = (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(8000) })).text()).trim();
+    const resolver = new dns.Resolver(); resolver.setServers(['1.1.1.1', '8.8.8.8']);
+    for (const n of names) {
+      const got = await resolver.resolve4(n).catch(() => []);
+      if (!got.includes(ip)) { r.ok = false; r.problem = got.length ? `${n} points to ${got[0]}, but your home IP is ${ip}. Update its DNS record.` : `${n} has no DNS record.`; break; }
+    }
+    const certDir = path.join(ROOT, 'caddy', 'data', 'certificates', 'acme-v02.api.letsencrypt.org-directory');
+    if (r.ok) for (const n of names) if (!fs.existsSync(path.join(certDir, n, `${n}.crt`))) { r.ok = false; r.problem = `No HTTPS certificate for ${n} yet: usually the router isn't forwarding ports 80 and 443.`; break; }
+  } catch (e) { r.ok = null; r.problem = 'Could not check (no internet?)'; }
+  state.remote = r;
+}
+setInterval(checkRemote, 10 * 60e3); setTimeout(checkRemote, 15000);
 
 // ---------------------------------------------------------------- platforms (Studio page)
 // Twitch: Helix API + IRC chat with the token from Set-TwitchBotToken.ps1 (TwitchTokenGenerator's client id).

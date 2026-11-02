@@ -226,8 +226,16 @@ function dashboard() {
 
   let svcKey = '';
   function renderServices() {
-    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats);
+    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats) + JSON.stringify(s.remote);
     if (key === svcKey) return; svcKey = key;
+    const rm = s.remote;
+    if (rm) {
+      $('remoteDot').className = 'status-dot ' + (!rm.domain ? '' : rm.ok ? 'ok' : rm.ok === false ? 'bad' : 'warn');
+      $('remoteDesc').textContent = !rm.domain
+        ? 'Off: this page only opens on the PC. To reach it from your phone anywhere, run "IRL Homekit - Set up remote dashboard" from the Start menu on the PC.'
+        : rm.ok ? 'Working at ' + rm.domain + ' and ' + rm.studio + ' (HTTPS).'
+        : rm.problem + ' Then run "IRL Homekit - Set up remote dashboard" on the PC to check again.';
+    }
     const down = Object.keys(SERVICE_INFO).filter((k) => sv[k] === false);
     const st = s.stats || {};
     const as = $('autoStart');

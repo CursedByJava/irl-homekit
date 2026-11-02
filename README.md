@@ -43,8 +43,8 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Sup
 - Windows 10/11 PC with a decent GPU (NVIDIA/AMD encoder recommended). You **don't** need OBS installed:
   IRL Homekit brings its own copy. If you already use OBS, the installer can copy your scenes and settings from it.
 - A home connection with a **public IPv4** you can port-forward (most fiber/cable; not CGNAT, see [ROUTER.md](docs/ROUTER.md))
-- Optional: a domain for the dashboard. Don't have one? Get a **free** name from DuckDNS or your own for about
-  $10/year: [docs/DOMAIN.md](docs/DOMAIN.md) walks you through both
+- Optional, to reach the dashboard from your phone anywhere: a **free** name from [DuckDNS](https://www.duckdns.org) or a
+  domain you own (about $10/year). A guided setup does the rest: see [Remote dashboard](#remote-dashboard).
 - Optional for the self-test: ffmpeg, `winget install Gyan.FFmpeg`
 
 Node.js (for the dashboard) is installed for you if it's missing.
@@ -56,8 +56,8 @@ Node.js (for the dashboard) is installed for you if it's missing.
    - Windows asks for administrator permission: click **Yes**. (If SmartScreen says "Windows protected your PC",
      click **More info → Run anyway**: the file is a two-line launcher for `install.ps1`, which you can read.)
    - The installer asks a few questions: your Twitch channel, whether to copy your regular OBS (everything, or just
-     one scene collection), which chat/alert overlays to show, a dashboard domain (optional, see
-     [DOMAIN.md](docs/DOMAIN.md)), a dashboard password, and whether to start with Windows (yes by default).
+     one scene collection), which chat/alert overlays to show, a dashboard password, whether to start with Windows (yes by default), and whether to set up the
+     [remote dashboard](#remote-dashboard).
    - When it's done, IRL Homekit opens.
 3. Open `C:\IRLHomekit\PHONE-SETUP.md`. It has **your** IRL Pro settings, passwords and the last manual steps:
    router port forwarding ([ROUTER.md](docs/ROUTER.md)), your Twitch stream key, and optional Kick/YouTube keys.
@@ -98,8 +98,8 @@ streams (close IRL Homekit first so the two don't compete for your graphics card
 - **Import from your regular OBS** any time: Start menu → **IRL Homekit - Import from OBS** copies all your
   profiles, scene collections, settings and (same OBS version) plugins. Your IRL Homekit setup is kept, and the
   previous settings are backed up first.
-- **Other tools** in the Start menu folder *IRL Homekit*: Status, Update scenes, Twitch chat token, Change login,
-  Check for updates, Save diagnostics, Uninstall.
+- **Other tools** in the Start menu folder *IRL Homekit*: Status, Update scenes, Set up remote dashboard, Twitch chat
+  token, Change login, Check for updates, Save diagnostics, Uninstall.
 
 ### Start with Windows (on by default)
 
@@ -131,6 +131,28 @@ and reopens IRL Homekit, in about 2 minutes. While IRL Homekit is a beta you get
 **Settings → Apps → IRL Homekit → Uninstall** (or Start menu → *IRL Homekit - Uninstall*). It closes IRL Homekit
 and removes its shortcuts, tasks, firewall rules and app entry, and asks whether to delete `C:\IRLHomekit` too.
 Your regular OBS isn't touched. Remember to remove the port forwards on your router.
+## Remote dashboard
+
+Reach your dashboard and Studio from your phone anywhere at `https://your-name...`, with a free HTTPS certificate.
+Start menu → **IRL Homekit - Set up remote dashboard** (the installer offers it too) and pick one:
+
+| Choice | You get | Cost | What you do |
+|---|---|---|---|
+| **1. Free DuckDNS name** (recommended) | `https://yourname.duckdns.org` | Free | Sign in at [duckdns.org](https://www.duckdns.org) (it opens for you), add a name, paste the token |
+| **2. A domain you own** | `https://irl.yourname.com` | ~$10/year ([cheap registrars](docs/DOMAIN.md#option-2-your-own-domain)) | Add the two DNS records it shows you (GoDaddy, Cloudflare, Namecheap and Porkbun steps included) |
+| **3. This PC only** | `http://localhost:8090` | Free | Nothing |
+
+Then it sets up the web server and firewall and **checks everything for you**, with a plain fix for anything that
+isn't right yet:
+
+- the name points to your home IP (it waits while new DNS records appear)
+- your router forwards ports 80 and 443 (it offers to open your router's page, see [ROUTER.md](docs/ROUTER.md))
+- the free HTTPS certificate was issued
+
+Run it again any time to re-check or switch. The dashboard's *Home PC* card also shows **Remote access**: working, or
+what to fix. With DuckDNS, IRL Homekit keeps your name pointed at your home IP and your phone settings use the name,
+so an IP change never breaks anything. More detail: [docs/DOMAIN.md](docs/DOMAIN.md).
+
 ## Signing in
 
 One login opens both the dashboard and Studio.

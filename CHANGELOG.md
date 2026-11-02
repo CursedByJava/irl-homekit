@@ -11,6 +11,21 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.2] - 2026-11-01
+
+### Added
+- **Set up remote dashboard** (Start menu, also offered by the installer): choose a free DuckDNS name, your own
+  domain, or this PC only. It walks you through each step (opens duckdns.org, shows the exact DNS records with
+  GoDaddy / Cloudflare / Namecheap / Porkbun steps), sets up the web server and firewall, and checks DNS, router
+  ports 80/443 and the HTTPS certificate, with a plain fix for anything missing.
+- **Remote access** status on the dashboard (*Home PC*): working, or what to fix.
+
+### Fixed
+- Copies installed before version numbers existed now get updates (they were treated as stable and skipped betas).
+
+### Changed
+- Releases are published automatically when `VERSION` changes on `main`.
+
 ## [1.0.0-beta.1] - 2026-11-01
 
 The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
@@ -70,7 +85,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.2...HEAD
+[1.0.0-beta.2]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.1...v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/CursedByJava/irl-homekit/compare/146fa7c...v1.0.0-beta.1
 [0.4.0]: https://github.com/CursedByJava/irl-homekit/commit/146fa7c
 [0.3.0]: https://github.com/CursedByJava/irl-homekit/commit/f31c39c

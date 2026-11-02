@@ -3,6 +3,10 @@
 A domain is optional. Without one, the dashboard only opens on the streaming PC itself. With one, you open
 `https://your-name…` from your phone anywhere, with a free HTTPS certificate that IRL Homekit sets up for you.
 
+**Easiest:** on the PC, Start menu → **IRL Homekit - Set up remote dashboard**. It walks you through either choice
+below, sets everything up and checks DNS, router ports and the certificate for you. The rest of this page explains
+what it does, if you'd rather do it by hand.
+
 You have two choices:
 
 | | DuckDNS (free) | Your own domain (about $10/year) |
@@ -19,9 +23,8 @@ You have two choices:
 2. Under **sub domain**, type a name, for example `willirl`, and press **add domain**. You now own
    `willirl.duckdns.org`.
 3. Copy the **token** shown at the top of the DuckDNS page.
-4. Run the installer and answer:
-   - Domain: `willirl.duckdns.org`
-   - DuckDNS token: the token from step 3
+4. Start menu → **IRL Homekit - Set up remote dashboard** → choose **1**, and enter the name and token.
+   (Command line: `Setup-RemoteDashboard.ps1 -DuckDnsName willirl -DuckDnsToken <token>`.)
 5. Forward **TCP 80** and **TCP 443** on your router to the PC ([ROUTER.md](ROUTER.md)).
 
 That's it. Your pages are:
@@ -59,8 +62,8 @@ In your registrar's DNS settings, add:
 | A | `irl` | your public IP |
 | A | `studio` | your public IP |
 
-Your public IP is in `PHONE-SETUP.md` (or run the **Status** shortcut). Then run the installer with
-Domain `irl.yourname.com`. Studio will be at `studio.yourname.com`.
+Your public IP is in `PHONE-SETUP.md` (or run the **Status** shortcut). Then run Start menu → **IRL Homekit - Set up
+remote dashboard** → choose **2** and enter `irl.yourname.com`. Studio will be at `studio.yourname.com`.
 
 ### When your home IP changes
 

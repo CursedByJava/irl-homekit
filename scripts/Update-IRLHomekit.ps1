@@ -12,7 +12,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoSlug = 'CursedByJava/irl-homekit'
 $settings = Get-Content "$InstallDir\settings.json" -Raw | ConvertFrom-Json
-$current = if (Test-Path "$InstallDir\VERSION") { (Get-Content "$InstallDir\VERSION" -Raw).Trim() } else { '0.0.0' }
+# Copies installed before version numbers existed were all betas.
+$current = if (Test-Path "$InstallDir\VERSION") { (Get-Content "$InstallDir\VERSION" -Raw).Trim() } else { '0.0.0-beta' }
 
 # Semantic versions: 1.2.3 > 1.2.3-beta.4 > 1.2.3-beta.3
 function ConvertTo-Ver($v) {

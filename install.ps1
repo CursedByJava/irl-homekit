@@ -158,9 +158,13 @@ if (-not $ImportObs -and ($collections -or $profiles) -and -not (Test-Path "$Ins
 }
 if (-not $prev -and -not $KickChannel) { $KickChannel = Ask 'Your Kick channel name (Enter = same as Twitch, or none)' $TwitchChannel }
 if (-not $prev -and -not $YoutubeChannelId) { $YoutubeChannelId = Ask 'Your YouTube channel ID, starts with UC (Enter = skip)' }
-if (-not $prev -and -not $Domain) {
-    Info 'No domain yet? Get a free one at duckdns.org or a cheap one for about $10/year: see docs\DOMAIN.md'
-    $Domain = Ask 'Domain for the remote dashboard, e.g. irl.example.com or yourname.duckdns.org (Enter = local only)'
+# Remote dashboard (reach it from your phone anywhere): the guided setup runs at the end of the install, once
+# IRL Homekit is open, so it can check DNS, router ports and the HTTPS certificate for you.
+$setupRemote = $false
+if (-not $prev -and -not $Domain -and -not $NonInteractive) {
+    Info 'Remote dashboard: control IRL Homekit from your phone anywhere at https://your-name..., with free HTTPS.'
+    Info 'It needs a name: a free one from DuckDNS (2 minutes) or a domain you own. A guided setup runs at the end.'
+    $setupRemote = (Ask 'Set up the remote dashboard? (Y/n)' 'Y') -notmatch '^n'
 }
 $Domain = "$Domain".Trim().ToLower()
 $oldSecrets = if (Test-Path "$InstallDir\secrets.json") { Get-Content "$InstallDir\secrets.json" -Raw | ConvertFrom-Json }
@@ -245,6 +249,7 @@ Copy-Item "$repo\VERSION", "$repo\CHANGELOG.md" "$InstallDir\" -Force
 Copy-Item "$repo\dashboard\server.mjs" "$InstallDir\dashboard\" -Force
 Copy-Item "$repo\dashboard\public\*" "$InstallDir\dashboard\public\" -Recurse -Force
 Copy-Item "$repo\tools" "$InstallDir\" -Recurse -Force
+Copy-Item "$repo\templates" "$InstallDir\" -Recurse -Force   # used by Setup-RemoteDashboard.ps1
 # Animated Starting Soon / BRB screens and the low-bitrate banner; keep the user's own config.js on re-runs.
 $hadOverlayCfg = Test-Path "$InstallDir\overlays\config.js"
 New-Item -ItemType Directory -Force "$InstallDir\overlays" | Out-Null
@@ -437,7 +442,7 @@ if ($Domain) {
     }
 } else {
     Remove-Item "$InstallDir\caddy\Caddyfile" -ErrorAction SilentlyContinue
-    Info 'Dashboard: http://localhost:8090 (local only; re-run with -Domain to put it online)'
+    Info 'Dashboard: http://localhost:8090 (this PC only; Start menu > IRL Homekit - Set up remote dashboard puts it online)'
 }
 
 # ------------------------------------------------------------------ 7. system
@@ -490,6 +495,7 @@ Write-Utf8 "$InstallDir\PHONE-SETUP.md" $guide
 
 if (-not $SkipSystem) {
     Start-ScheduledTask -TaskName 'IRL Homekit'
+    if ($setupRemote) { Step 9 'Remote dashboard'; & "$InstallDir\scripts\Setup-RemoteDashboard.ps1" -InstallDir $InstallDir }
 }
 
 Write-Host "`nDone.$(if (-not $SkipSystem) { ' IRL Homekit is opening.' })" -ForegroundColor Green

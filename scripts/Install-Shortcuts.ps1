@@ -65,6 +65,7 @@ $tools = [ordered]@{
     'Update scenes'     = @('Update-IRLScenes', 'Rebuild the IRL scenes after you change your normal OBS scenes')
     'Import from OBS'   = @('Import-ObsSettings', 'Copy profiles, scene collections, settings and plugins from your regular OBS')
     'Twitch chat token' = @('Set-TwitchBotToken', 'Save the Twitch token for chat commands')
+    'Set up remote dashboard' = @('Setup-RemoteDashboard', 'Reach your dashboard from your phone anywhere: free DuckDNS name or your own domain, with checks')
     'Change login'      = @('Set-DashboardLogin', 'Change the dashboard and Studio username or password')
     'Check for updates' = @('Update-IRLHomekit', 'See if there is a newer IRL Homekit and install it')
     'Save diagnostics'  = @('Save-Diagnostics', 'Save logs and settings (no passwords) to attach to a bug report')
