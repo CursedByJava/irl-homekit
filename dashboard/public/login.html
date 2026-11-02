@@ -31,8 +31,11 @@
       <div class="err" id="err" role="alert">
         <b>Wrong username or password.</b> Check both and try again. After 5 wrong tries, sign-in is locked for 15 minutes.
       </div>
+      <label class="keep"><input type="checkbox" name="keep" checked> <span>Keep me signed in</span></label>
+      <input type="hidden" name="next" id="next">
       <button class="btn go block" type="submit">Sign in</button>
-      <div class="foot">You stay signed in on this device for 30 days.</div>
+      <div class="foot">Signs you in to the dashboard and Studio. Kept signed in, you stay in as long as you open it at
+        least once every 30 days. Untick it on a phone that isn't yours.</div>
       <details class="forgot">
         <summary>Forgot your login?</summary>
         <p>On your streaming PC, open <b>PHONE-SETUP.md</b> in the IRL Homekit folder. To pick a new password, open

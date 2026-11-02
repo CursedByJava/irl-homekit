@@ -4,6 +4,7 @@ const $ = (id) => document.getElementById(id);
 // ---------------------------------------------------------------- login page
 if ($('err')) {
   const e = new URLSearchParams(location.search).get('e');
+  $('next').value = new URLSearchParams(location.search).get('next') || '';   // back to Studio after signing in
   if (e === 'locked') $('err').innerHTML = '<b>Sign-in is locked for 15 minutes.</b> There were 5 wrong tries in a row from this network. Wait, then try again.';
   if (e) $('err').classList.add('show');
 } else {

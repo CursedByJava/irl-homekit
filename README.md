@@ -171,8 +171,9 @@ One login opens both the dashboard and Studio.
 - **First install:** the installer asks you for a username (default: your Twitch channel) and a password. Press
   Enter at the password prompt and it makes a strong one for you. You'll see the login at the end of the install,
   and it's saved in `C:\IRLHomekit\PHONE-SETUP.md`.
-- **Sign in:** open your dashboard address on your phone, type the login, and let your password manager save it.
-  You stay signed in for 30 days on each device.
+- **Sign in once for both pages:** signing in to the dashboard also signs you in to Studio, and the other way round.
+- **Stay signed in:** *Keep me signed in* is ticked by default, so you stay signed in as long as you open it at least
+  once every 30 days. Untick it on a phone that isn't yours: you're signed out when that browser closes.
 - **Change it or forgot it:** on the PC, Start menu → **IRL Homekit - Change login**. Pick a
   new username/password; every device is signed out and `PHONE-SETUP.md` is updated. No restart needed.
 
@@ -190,7 +191,7 @@ One login opens both the dashboard and Studio.
 - **Home PC:** health of each service with restart buttons, and the **Start with Windows** switch
 - **Auto-switch history**
 
-Security: HTTPS only, scrypt-hashed password, 30-day HttpOnly/SameSite=Strict session cookie, 15-minute lockout
+Security: HTTPS only, scrypt-hashed password, HttpOnly/Secure/SameSite=Lax session cookie (renews with use), 15-minute lockout
 after 5 failed sign-ins, strict CSP, API bound to localhost behind Caddy.
 
 ## Studio: your channels in one place

@@ -18,8 +18,10 @@ it and on the dashboard.
 
 - The dashboard is served over HTTPS only (Caddy + Let's Encrypt) and listens on the PC itself (127.0.0.1); only
   Caddy is reachable from outside.
-- Your dashboard password is stored as a scrypt hash; sessions use 30-day HttpOnly, Secure, SameSite=Strict
-  cookies; 5 wrong passwords lock sign-in for 15 minutes; strict Content Security Policy.
+- Your dashboard password is stored as a scrypt hash; sessions use HttpOnly, Secure, SameSite=Lax cookies shared by the
+  dashboard and Studio addresses ("Keep me signed in" renews them with use, up to 30 days idle; otherwise they end
+  with the browser); every action also needs a custom request header (blocks cross-site requests); 5 wrong passwords lock sign-in for 15
+  minutes; strict Content Security Policy.
 - The phone receivers need a passphrase (SRTLA) or a username and password (SRT/RTMP).
 - OBS WebSocket, MediaMTX's API and the dashboard port are never opened on the router.
 - Passwords, tokens and stream keys stay in `C:\IRLHomekit\secrets.json` and OBS's settings on your PC; nothing

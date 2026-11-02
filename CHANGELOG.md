@@ -11,6 +11,16 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.5] - 2026-11-02
+
+### Changed
+- **One sign-in for the dashboard and Studio**: signing in on one address signs you in on the other.
+- **Keep me signed in** (ticked by default): your session renews every time you use it, so you stay signed in as long
+  as you open it at least once every 30 days, instead of being signed out 30 days after signing in. Unticked, you're
+  signed out when the browser closes.
+- Opening the dashboard from a link in another app (Messages, Discord) no longer asks you to sign in again.
+- Signing in from Studio brings you back to Studio. Existing sign-ins carry over.
+
 ## [1.0.0-beta.4] - 2026-11-02
 
 ### Changed
@@ -106,7 +116,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.4...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.5...HEAD
+[1.0.0-beta.5]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.4...v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.1...v1.0.0-beta.2

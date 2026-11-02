@@ -442,14 +442,47 @@ function checkPassword(pw) {
 }
 function safeEqual(a, b) { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); }
 function cookies(req) { return Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter((p) => p.length === 2)); }
-function authed(req) {
-  const t = cookies(req)['__Host-irlhk']; if (!t) return false;
-  const exp = sessions.get(t); if (!exp || exp < Date.now()) { sessions.delete(t); return false; }
-  return true;
+// One sign-in covers the dashboard and Studio: the cookie is shared by both addresses (irl.example.com and
+// studio.example.com, or name.duckdns.org and studio.name.duckdns.org). "Keep me signed in" sessions renew
+// themselves on every visit, so you stay signed in as long as you use it at least once every 30 days; without it,
+// the session ends when the browser closes (or after 12 hours without use).
+const COOKIE = '__Secure-irlhk', OLD_COOKIE = '__Host-irlhk';
+const KEEP_MS = SESSION_DAYS * 864e5, SHORT_MS = 12 * 3600e3;
+function cookieDomain(req) {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase(), d = settings.domain, st = settings.studioDomain;
+  if (!d || (host !== d && host !== st)) return '';            // localhost, LAN IP: cookie stays on this address
+  if (st && st.endsWith('.' + d)) return d;                      // name.duckdns.org + studio.name.duckdns.org
+  const parent = d.replace(/^[^.]+\./, '');                      // irl.example.com -> example.com
+  return st && st.endsWith('.' + parent) && parent.includes('.') ? parent : '';
+}
+function sessionCookie(req, token, s) {
+  const dom = cookieDomain(req);
+  return `${COOKIE}=${token}; Path=/; Secure; HttpOnly; SameSite=Lax${dom ? `; Domain=${dom}` : ''}${s.keep ? `; Max-Age=${SESSION_DAYS * 86400}` : ''}`;
+}
+function clearCookies(req) {
+  const dom = cookieDomain(req), gone = 'Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0';
+  return [`${COOKIE}=; ${gone}${dom ? `; Domain=${dom}` : ''}`, `${COOKIE}=; ${gone}`, `${OLD_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`];
+}
+// Returns the session token if signed in, renewing the session (and its cookie, on `res`) when it's an hour old.
+function authed(req, res) {
+  const c = cookies(req), t = c[COOKIE] || c[OLD_COOKIE]; if (!t) return null;
+  const s = sessions.get(t);
+  if (!s || s.exp < Date.now()) { sessions.delete(t); return null; }
+  const now = Date.now(), life = s.keep ? KEEP_MS : SHORT_MS;
+  if (res && (now - (s.renewed || 0) > 3600e3 || !c[COOKIE])) {
+    s.exp = now + life; s.renewed = now; saveSessions();
+    res.setHeader('Set-Cookie', c[COOKIE] ? [sessionCookie(req, t, s)] : [sessionCookie(req, t, s), `${OLD_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`]);
+  }
+  return t;
 }
 function clientIp(req) { return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress; }
 function saveSessions() { fs.writeFile(path.join(DIR, 'sessions.json'), JSON.stringify([...sessions]), () => {}); }
-try { for (const [t, e] of JSON.parse(fs.readFileSync(path.join(DIR, 'sessions.json'), 'utf8'))) if (e > Date.now()) sessions.set(t, e); } catch { }
+try {
+  for (const [t, v] of JSON.parse(fs.readFileSync(path.join(DIR, 'sessions.json'), 'utf8'))) {
+    const s = typeof v === 'number' ? { exp: v, keep: true, renewed: 0 } : v;   // sessions saved by older versions were 30-day ones
+    if (s.exp > Date.now()) sessions.set(t, s);
+  }
+} catch { }
 // Set-DashboardLogin.ps1 rewrites config.json; pick up the new login and sign every device out.
 fs.watchFile(CONFIG_FILE, { interval: 2000 }, () => {
   let next; try { next = readJson(CONFIG_FILE); } catch { return; }
@@ -616,23 +649,28 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/login' && req.method === 'GET') return send(res, 200, 'text/html; charset=utf-8', page('login.html'));
     if (url.pathname === '/login' && req.method === 'POST') {
       const ip = clientIp(req); const f = fails.get(ip) || { n: 0, until: 0 };
-      if (f.until > Date.now()) return send(res, 303, 'text/plain', '', { Location: '/login?e=locked' });
       const form = new URLSearchParams(await readBody(req));
+      const nextQ = form.get('next') === '/studio' ? '&next=/studio' : '';
+      if (f.until > Date.now()) return send(res, 303, 'text/plain', '', { Location: '/login?e=locked' + nextQ });
       const ok = safeEqual(form.get('username') || '', cfg.username) & checkPassword(form.get('password') || '');
       if (!ok) {
         f.n++; if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; }
         fails.set(ip, f); log('login failed from', ip);
         await new Promise((r) => setTimeout(r, 800));
-        return send(res, 303, 'text/plain', '', { Location: '/login?e=1' });
+        return send(res, 303, 'text/plain', '', { Location: '/login?e=1' + nextQ });
       }
       fails.delete(ip);
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, Date.now() + SESSION_DAYS * 864e5); saveSessions(); log('login ok from', ip);
-      return send(res, 303, 'text/plain', '', { Location: '/', 'Set-Cookie': `__Host-irlhk=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${SESSION_DAYS * 86400}` });
+      const keep = form.get('keep') !== null;   // "Keep me signed in" (ticked by default)
+      const s = { exp: Date.now() + (keep ? KEEP_MS : SHORT_MS), keep, renewed: Date.now() };
+      sessions.set(token, s); saveSessions(); log('login ok from', ip, keep ? '(kept signed in)' : '(this browser session)');
+      // Back to the page they came from (dashboard or Studio), never to another site.
+      const next = /^\/(studio)?$/.test(form.get('next') || '') ? form.get('next') : '/';
+      return send(res, 303, 'text/plain', '', { Location: next, 'Set-Cookie': [sessionCookie(req, token, s), `${OLD_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`] });
     }
     if (url.pathname === '/logout') {
-      sessions.delete(cookies(req)['__Host-irlhk']); saveSessions();
-      return send(res, 303, 'text/plain', '', { Location: '/login', 'Set-Cookie': '__Host-irlhk=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0' });
+      const c = cookies(req); sessions.delete(c[COOKIE]); sessions.delete(c[OLD_COOKIE]); saveSessions();
+      return send(res, 303, 'text/plain', '', { Location: '/login', 'Set-Cookie': clearCookies(req) });
     }
 
     // Kick webhooks: no session, but every message must carry a valid Kick signature.
@@ -683,9 +721,9 @@ const server = http.createServer(async (req, res) => {
       return back('connected');
     }
 
-    if (!authed(req)) {
+    if (!authed(req, res)) {
       if (url.pathname.startsWith('/api') || url.pathname === '/events' || url.pathname === '/preview.jpg') return send(res, 401, 'text/plain', 'login required');
-      return send(res, 303, 'text/plain', '', { Location: '/login' });
+      return send(res, 303, 'text/plain', '', { Location: url.pathname === '/studio' ? '/login?next=/studio' : '/login' });
     }
 
     if (url.pathname === '/oauth/kick/start') {

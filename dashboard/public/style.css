@@ -302,6 +302,8 @@ dialog .actions .btn.ghost { background: var(--fill); color: var(--label); }
 .login .err b { color: var(--red); }
 .login .err.show { display: block; animation: rise .3s var(--ease); }
 .foot { margin-top: 16px; font-size: 13px; color: var(--label-3); }
+.login .keep { display: flex; align-items: center; gap: 10px; margin: 18px 4px 0; font-size: 15px; color: var(--label); cursor: pointer; text-align: left; }
+.login .keep input { width: 20px; height: 20px; margin: 0; padding: 0; accent-color: var(--blue); box-shadow: none; border-radius: 6px; flex: none; }
 .forgot { margin-top: 12px; font-size: 13px; }
 .forgot summary { list-style: none; cursor: pointer; color: var(--blue); font-weight: 500; display: inline-block; padding: 6px 8px; border-radius: 8px; }
 .forgot summary::-webkit-details-marker { display: none; }
