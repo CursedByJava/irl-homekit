@@ -176,12 +176,23 @@ if (-not (Test-Path $stamp) -or (Get-Item $stamp).LastWriteTime -lt (Get-Date).A
 }
 $nextTokenCheck = Get-Date
 $nextDuck = Get-Date
+$wsPort = if ($settings.obsWebsocketPort) { $settings.obsWebsocketPort } else { 4455 }
+$noWsSince = $null
 while ($true) {
   try {
-    if (-not (Get-IrlObs)) {
+    $irlObs = Get-IrlObs | Select-Object -First 1
+    if (-not $irlObs) {
         if (Test-ObsCrashed) { Log 'IRL Homekit OBS crashed; restarting it'; Start-IrlObs -Minimized }
         else { Stop-Everything; break }
-    }
+    } elseif (-not (Get-NetTCPConnection -LocalPort $wsPort -State Listen -ErrorAction SilentlyContinue)) {
+        # Running but not answering: OBS crashed and is sitting on its crash window. Restart it after 45 seconds.
+        if (-not $noWsSince) { $noWsSince = Get-Date }
+        elseif ((Get-Date) - $noWsSince -gt [TimeSpan]::FromSeconds(45) -and (Get-Date) - $irlObs.StartTime -gt [TimeSpan]::FromSeconds(60)) {
+            Log 'IRL Homekit OBS stopped responding (crashed with its window open); restarting it'
+            $irlObs | Stop-Process -Force -ErrorAction SilentlyContinue; $noWsSince = $null
+            Start-Sleep -Seconds 2; Start-IrlObs -Minimized
+        }
+    } else { $noWsSince = $null }
     Set-IrlBranding
     if ((Get-Date) -ge $nextTokenCheck) {
         $nextTokenCheck = (Get-Date).AddHours(1)

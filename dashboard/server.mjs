@@ -118,9 +118,11 @@ async function pollObs() {
   state.obs.connected = obs.ready;
   if (!obs.ready) return;
   try {
-    const [scene, stream, record, stats, list, outputs, video] = await Promise.all([
+    // Never GetOutputList: in OBS 33 it crashes OBS if it runs while an output is being created (e.g. the multistream
+    // plugin starting Kick/YouTube the moment you press Start stream). The stream status has what we need.
+    const [scene, stream, record, stats, list, video] = await Promise.all([
       obs.req('GetCurrentProgramScene'), obs.req('GetStreamStatus'), obs.req('GetRecordStatus'), obs.req('GetStats'),
-      obs.req('GetSceneList'), obs.req('GetOutputList'), obs.req('GetVideoSettings')]);
+      obs.req('GetSceneList'), obs.req('GetVideoSettings')]);
     state.video = { fps: Math.round(video.fpsNumerator / video.fpsDenominator), width: video.outputWidth, height: video.outputHeight };
     state.scene = scene.currentProgramSceneName;
     state.scenes = list.scenes.slice().reverse().map((s) => s.sceneName);
@@ -132,8 +134,7 @@ async function pollObs() {
     state.record = { active: record.outputActive, duration: record.outputDuration };
     state.stats = { cpu: +stats.cpuUsage.toFixed(1), fps: +stats.activeFps.toFixed(1), renderSkipped: stats.renderSkippedFrames,
       outputSkipped: stats.outputSkippedFrames, memory: Math.round(stats.memoryUsage) };
-    state.outputs = outputs.outputs.filter((o) => o.outputActive && !/virtualcam|record|replay/i.test(o.outputKind + o.outputName))
-      .map((o) => ({ name: o.outputName, kind: o.outputKind, reconnecting: o.outputReconnecting }));
+    state.outputs = stream.outputActive ? [{ name: 'adv_stream', kind: 'rtmp_output', reconnecting: stream.outputReconnecting }] : [];
   } catch (e) { /* OBS busy or reconnecting */ }
 }
 

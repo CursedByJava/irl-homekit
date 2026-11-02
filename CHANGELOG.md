@@ -11,6 +11,15 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.6] - 2026-11-02
+
+### Fixed
+- **OBS could crash when you pressed Start stream.** The dashboard asked OBS for its list of outputs every few seconds;
+  in OBS 33 that request crashes OBS if it lands while the multistream plugin is creating the Kick/YouTube outputs.
+  The dashboard no longer asks for it.
+- **A crashed OBS that stayed on its crash window wasn't restarted.** IRL Homekit now notices when its OBS is running
+  but not answering for 45 seconds, and restarts it.
+
 ## [1.0.0-beta.5] - 2026-11-02
 
 ### Changed
@@ -116,7 +125,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.5...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.6...HEAD
+[1.0.0-beta.6]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.5...v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.4...v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.2...v1.0.0-beta.3
