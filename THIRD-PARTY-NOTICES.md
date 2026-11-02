@@ -11,6 +11,8 @@ using it. None of their code is included in this repository.
 | obs-multi-rtmp | 0.7.4.5 | GPL-2.0 | https://github.com/sorayuki/obs-multi-rtmp |
 | Caddy | v2.11.7 | Apache-2.0 | https://github.com/caddyserver/caddy |
 
+Bundled in this repo: the Inter typeface (dashboard/public/fonts, SIL Open Font License 1.1, https://rsms.me/inter, license file included).
+
 Also used, installed separately by you: OBS Studio (GPL-2.0), Node.js (MIT), ffmpeg (LGPL/GPL, self-test only).
 
 Phone apps this works with: IRL Pro (Android), Moblin (iOS), BELABOX encoders.

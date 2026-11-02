@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 const PLATFORM = { twitch: { name: 'Twitch', color: '#a970ff' }, kick: { name: 'Kick', color: '#53fc18' }, youtube: { name: 'YouTube', color: '#ff4e45' } };
 let s = null; let lastMsg = 0; let filter = 'all'; let titleDirty = false;
 const messages = [];
+if (location.hostname.startsWith('studio.')) document.querySelector('[data-stream]').href = 'https://' + location.hostname.replace(/^studio\./, 'irl.') + '/';
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 let toastTimer;
@@ -183,6 +184,20 @@ $('titleSave').onclick = async () => {
   const r = await act({ action: 'setTitle', title: $('titleInput').value.trim() }, 'Title updated.');
   if (r) titleDirty = false; updateCount();
 };
+// Kick names some categories differently; when there's no match, let the user pick Kick's version.
+function showKickChoices(twitchName, list) {
+  const box = $('kickCats');
+  if (!list) { box.hidden = true; box.replaceChildren(); return; }
+  box.hidden = false;
+  const head = el('div', 'desc'); head.append(`Kick doesn't have a category called "${twitchName}". Pick the Kick category to use:`);
+  const btns = list.length ? list.map((k) => {
+    const b = el('button', 'cat', k.name);
+    b.onclick = async () => { const r = await act({ action: 'setKickCategory', id: k.id, name: k.name }, `Kick category set to ${k.name}.`); if (r) showKickChoices(); };
+    return b;
+  }) : [el('div', 'empty-note', 'Kick returned no similar categories. Search for a different name above.')];
+  const skip = el('button', 'btn small ghost', 'Leave Kick as it is'); skip.onclick = () => showKickChoices();
+  box.replaceChildren(head, ...btns, skip);
+}
 let catTimer;
 $('catInput').addEventListener('input', () => {
   clearTimeout(catTimer);
@@ -197,7 +212,7 @@ $('catInput').addEventListener('input', () => {
       b.append(img, el('span', '', c.name));
       b.onclick = async () => {
         const ok = await act({ action: 'setCategory', id: c.id, name: c.name }, `Category set to ${c.name}.`);
-        if (ok) { $('catInput').value = ''; $('catResults').replaceChildren(); }
+        if (ok) { $('catInput').value = ''; $('catResults').replaceChildren(); showKickChoices(c.name, ok.kickSuggestions); }
       };
       return b;
     }));

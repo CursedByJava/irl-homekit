@@ -267,6 +267,8 @@ async function kickAfterLogin() {
   log('kick connected as', me?.name, 'subscriptions:', JSON.stringify(sub.data || sub).slice(0, 300));
 }
 let kickPublicKey = null; let kickKeyAt = 0; const kickSeen = new Set();
+const kickInfo = { title: secrets.kickLastTitle || '', category: secrets.kickLastCategory || '' };
+function rememberKick(patch) { Object.assign(kickInfo, patch); saveSecrets({ kickLastTitle: kickInfo.title, kickLastCategory: kickInfo.category }); }
 async function kickVerify(headers, raw) {
   if (!kickPublicKey || Date.now() - kickKeyAt > 6 * 3600e3) {
     const j = await (await fetch('https://api.kick.com/public/v1/public-key')).json();
@@ -281,8 +283,11 @@ async function pollKick() {
   if (secrets.kickRefreshToken) {
     try {
       const j = await kickApi('GET', 'channels'); const c = j.data?.[0] || {};
+      // Kick only reports title/category while live, so fall back to what Studio last set.
+      if (c.stream_title) kickInfo.title = c.stream_title;
+      if (c.category?.name) kickInfo.category = c.category.name;
       state.platforms.kick = { connected: true, authorized: true, live: !!c.stream?.is_live, viewers: c.stream?.viewer_count || 0,
-        startedAt: c.stream?.is_live ? c.stream.start_time : null, title: c.stream_title || '', category: c.category?.name || '', url: 'https://kick.com/' + (c.slug || slug) };
+        startedAt: c.stream?.is_live ? c.stream.start_time : null, title: kickInfo.title, category: kickInfo.category, url: 'https://kick.com/' + (c.slug || slug) };
       return;
     } catch (e) { log('kick api poll failed:', e.message); }
   }
@@ -427,7 +432,7 @@ async function action(body) {
       if (!title || title.length > 140) throw new Error('TITLE_LENGTH');
       const done = [], failed = [];
       await helix('PATCH', 'channels?broadcaster_id=' + tw.user, { title }).then(() => done.push('Twitch'), (e) => failed.push('Twitch (' + e.message + ')'));
-      if (secrets.kickRefreshToken) await kickApi('PATCH', 'channels', { stream_title: title }).then(() => done.push('Kick'), (e) => failed.push('Kick (' + e.message + ')'));
+      if (secrets.kickRefreshToken) await kickApi('PATCH', 'channels', { stream_title: title }).then(() => { done.push('Kick'); rememberKick({ title }); }, (e) => failed.push('Kick (' + e.message + ')'));
       if (secrets.youtubeRefreshToken) {
         const b = yt.broadcast;
         if (!b) failed.push('YouTube (no live or upcoming broadcast to rename yet; it appears once OBS starts sending)');
@@ -446,20 +451,29 @@ async function action(body) {
     case 'setCategory': {
       if (!/^\d+$/.test(String(body.id))) throw new Error('unknown category');
       const name = String(body.name || '');
-      const done = [], failed = [];
+      const done = [], failed = []; let kickSuggestions;
       await helix('PATCH', 'channels?broadcaster_id=' + tw.user, { game_id: String(body.id) }).then(() => done.push('Twitch'), (e) => failed.push('Twitch (' + e.message + ')'));
       if (secrets.kickRefreshToken && name) {
-        // Kick has its own category list; use the entry with the same name.
+        // Kick has its own category list with slightly different names (Twitch "Counter-Strike 1.6" is Kick
+        // "Counter-Strike: 1.6"), so compare names without punctuation or case.
         try {
+          const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
           const r = await kickApi('GET', 'categories?q=' + encodeURIComponent(name));
-          const match = (r.data || []).find((c) => c.name.toLowerCase() === name.toLowerCase());
-          if (match) { await kickApi('PATCH', 'channels', { category_id: match.id }); done.push('Kick'); }
-          else failed.push(`Kick (no Kick category called "${name}")`);
+          const match = (r.data || []).find((c) => norm(c.name) === norm(name));
+          if (match) { await kickApi('PATCH', 'channels', { category_id: match.id }); rememberKick({ category: match.name }); done.push(match.name === name ? 'Kick' : `Kick (as "${match.name}")`); }
+          else { kickSuggestions = (r.data || []).slice(0, 6).map((c) => ({ id: c.id, name: c.name })); failed.push('Kick'); }
         } catch (e) { failed.push('Kick (' + e.message + ')'); }
       }
       await Promise.all([pollTwitch(), pollKick()]);
       if (!done.length) throw new Error(failed.join('; '));
-      return { note: 'Category updated on ' + done.join(' and ') + '.' + (failed.length ? ' Not changed: ' + failed.join('; ') : '') };
+      return { note: 'Category updated on ' + done.join(' and ') + '.' + (kickSuggestions ? ' Kick has no category with that exact name; pick one below.' : failed.length ? ' Not changed: ' + failed.join('; ') : ''), kickSuggestions };
+    }
+    case 'setKickCategory': {
+      if (!/^\d+$/.test(String(body.id))) throw new Error('unknown category');
+      await kickApi('PATCH', 'channels', { category_id: Number(body.id) });
+      if (body.name) rememberKick({ category: String(body.name) });
+      await pollKick();
+      return { note: 'Kick category updated.' };
     }
     case 'updateScenes': {
       if (state.stream.active || state.record.active) throw new Error('SCENES_WHILE_LIVE');
@@ -487,7 +501,9 @@ async function action(body) {
 
 // ---------------------------------------------------------------- http
 const clients = new Set();
-const STATIC = { '/app.js': 'application/javascript', '/studio.js': 'application/javascript', '/style.css': 'text/css', '/icon.svg': 'image/svg+xml', '/manifest.json': 'application/manifest+json' };
+const STATIC = { '/app.js': 'application/javascript', '/studio.js': 'application/javascript', '/style.css': 'text/css', '/icon.svg': 'image/svg+xml', '/manifest.json': 'application/manifest+json',
+  '/apple-touch-icon.png': 'image/png', '/icon-192.png': 'image/png', '/icon-512.png': 'image/png', '/fonts/InterVariable.woff2': 'font/woff2' };
+const IMMUTABLE = new Set(['/fonts/InterVariable.woff2']);
 const SEC_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; img-src 'self' blob: data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cache-Control': 'no-store',
@@ -502,7 +518,7 @@ function publicState() { const { _sb, ...s } = state; s.updated = Date.now(); s.
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
-    if (STATIC[url.pathname]) return send(res, 200, STATIC[url.pathname], page(url.pathname.slice(1)), { 'Cache-Control': 'no-cache' });
+    if (STATIC[url.pathname]) return send(res, 200, STATIC[url.pathname], page(url.pathname.slice(1)), { 'Cache-Control': IMMUTABLE.has(url.pathname) ? 'public, max-age=31536000, immutable' : 'no-cache' });
 
     // Public pages required by Google/Kick app listings (no sign-in needed, no personal data).
     if (url.pathname === '/about' || url.pathname === '/privacy') return send(res, 200, 'text/html; charset=utf-8', page('privacy.html'), { 'Cache-Control': 'public, max-age=3600' });

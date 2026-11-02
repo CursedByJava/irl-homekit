@@ -11,6 +11,8 @@ if ($('err')) {
 }
 
 function dashboard() {
+  // On the public domain the two pages live on separate hosts (irl. and studio.).
+  if (location.hostname.startsWith('irl.')) document.querySelector('[data-studio]').href = 'https://' + location.hostname.replace(/^irl\./, 'studio.') + '/';
   // Signal thresholds match NOALBS: under 1000 kbps = LOW scene, under 300 kbps = BRB scene.
   const LOW = 1000, OFFLINE = 300, METER_MAX = 8000;
   const SERVICE_INFO = {

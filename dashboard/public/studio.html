@@ -3,18 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0d12">
   <meta name="robots" content="noindex, nofollow">
   <title>Studio · IRL Homekit</title>
-  <link rel="icon" href="/icon.svg">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Studio">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><img src="/icon.svg" alt="">Studio</div>
+    <div class="brand"><img src="/icon.svg" alt=""><span class="brand-name">IRL Homekit</span></div>
+    <nav class="nav-seg" aria-label="Switch page"><a href="/" data-stream>Stream</a><a class="on" href="/studio" aria-current="page">Studio</a></nav>
     <span class="pill" id="viewersPill"><span class="dot"></span><span id="viewersText">Loading…</span></span>
-    <a class="iconbtn" href="/logout" title="Sign out">Sign out</a>
+    <a class="iconbtn" href="/logout" title="Sign out" aria-label="Sign out"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M14 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 8l-4 4 4 4M6 12h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Sign out</span></a>
   </header>
 
   <div class="banner error" id="linkBanner" role="alert"></div>
@@ -40,6 +49,7 @@
       <div class="desc" id="catCurrent">Current: –</div>
       <input id="catInput" type="search" placeholder="Search, e.g. Just Chatting, IRL, Travel" autocomplete="off">
       <div class="cat-results" id="catResults"></div>
+      <div class="cat-results kick-cats" id="kickCats" hidden></div>
       <p class="desc note" id="infoNote">Updates every connected platform.</p>
     </section>
 
