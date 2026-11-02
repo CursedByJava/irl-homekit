@@ -4,7 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +15,14 @@ let cfg = readJson(CONFIG_FILE);
 const secrets = readJson(`${ROOT}/secrets.json`);
 const settings = readJson(`${ROOT}/settings.json`);
 const PORT = cfg.port || 8090;
+// Windows task that opens IRL Homekit at sign-in (scripts/Install-Shortcuts.ps1 -AutoStart On|Off).
+const SIGNIN_TASK = 'IRL Homekit (sign-in)';
+function readAutoStart() {
+  return new Promise((resolve) => execFile('schtasks.exe', ['/query', '/tn', SIGNIN_TASK, '/fo', 'csv', '/nh'], { windowsHide: true }, (err, out) => {
+    if (!err) state.autoStart = !/"Disabled"/i.test(out);
+    resolve();
+  }));
+}
 const SESSION_DAYS = 30;
 
 function log(...a) { console.log(new Date().toISOString(), ...a); }
@@ -53,7 +61,7 @@ class Obs {
     });
   }
 }
-const obs = new Obs('ws://127.0.0.1:4455', secrets.obsWebsocketPassword);
+const obs = new Obs(`ws://127.0.0.1:${settings.obsWebsocketPort || 4455}`, secrets.obsWebsocketPassword);
 
 // ---------------------------------------------------------------- live state
 const state = {
@@ -152,9 +160,9 @@ function pollServices() {
   execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true }, (err, out) => {
     if (err) return;
     const names = new Set(out.split(/\r?\n/).map((l) => l.split('","')[0].replace(/^"/, '').toLowerCase()));
-    state.services = { obs: names.has('obs64.exe'), mediamtx: names.has('mediamtx.exe'), 'go-irl': names.has('go-irl.exe'), noalbs: names.has('noalbs.exe') };
+    // OBS: your normal OBS may be open too, so "running" means IRL Homekit's own OBS answering on its WebSocket.
+    state.services = { obs: obs.ready, mediamtx: names.has('mediamtx.exe'), 'go-irl': names.has('go-irl.exe'), noalbs: names.has('noalbs.exe') };
     if (settings.domain) state.services.caddy = names.has('caddy.exe');
-    state.paused = fs.existsSync(`${ROOT}/PAUSE`);
   });
 }
 
@@ -191,6 +199,40 @@ setInterval(() => {
 setInterval(pollObs, 1000); setInterval(pollMediamtx, 1000); setInterval(pollInputs, 3000);
 setInterval(pollServices, 5000); setInterval(pollSwitches, 3000); setInterval(grabPreview, 2000);
 pollServices(); pollSwitches();
+setInterval(readAutoStart, 30000); readAutoStart();
+
+// ---------------------------------------------------------------- updates (GitHub releases)
+const VERSION = (() => { try { return fs.readFileSync(path.join(ROOT, 'VERSION'), 'utf8').trim(); } catch { return ''; } })();
+state.version = VERSION;
+function parseVer(v) { const [core, pre] = String(v).replace(/^v/, '').split('-', 2); return { n: (core.split('.').map(Number).concat([0, 0, 0])).slice(0, 3), pre: pre ? pre.split('.') : [] }; }
+function cmpVer(a, b) {
+  for (let i = 0; i < 3; i++) if (a.n[i] !== b.n[i]) return Math.sign(a.n[i] - b.n[i]);
+  if (!a.pre.length || !b.pre.length) return (a.pre.length ? -1 : 0) + (b.pre.length ? 1 : 0);
+  for (let i = 0; i < Math.max(a.pre.length, b.pre.length); i++) {
+    if (i >= a.pre.length) return -1; if (i >= b.pre.length) return 1;
+    const x = a.pre[i], y = b.pre[i], xn = /^\d+$/.test(x), yn = /^\d+$/.test(y);
+    if (xn && yn) { if (+x !== +y) return Math.sign(+x - +y); } else if (x !== y) return xn ? -1 : yn ? 1 : (x < y ? -1 : 1);
+  }
+  return 0;
+}
+async function checkForUpdate() {
+  if (!VERSION) return;
+  try {
+    const cur = parseVer(VERSION);
+    const channel = settings.updateChannel || (cur.pre.length ? 'beta' : 'stable');   // betas get betas, stable gets stable
+    const r = await fetch('https://api.github.com/repos/CursedByJava/irl-homekit/releases?per_page=30', { headers: { 'User-Agent': 'IRL-Homekit-dashboard' } });
+    if (!r.ok) return;
+    let best = null;
+    for (const rel of await r.json()) {
+      if (rel.draft || (rel.prerelease && channel !== 'beta')) continue;
+      const v = parseVer(rel.tag_name);
+      if (!best || cmpVer(v, best.v) > 0) best = { v, rel };
+    }
+    state.update = best && cmpVer(best.v, cur) > 0
+      ? { latest: best.rel.tag_name.replace(/^v/, ''), notes: String(best.rel.body || '').slice(0, 800), url: best.rel.html_url } : null;
+  } catch (e) { log('update check failed:', e.message); }
+}
+setInterval(checkForUpdate, 6 * 3600e3); setTimeout(checkForUpdate, 20000);
 
 // ---------------------------------------------------------------- platforms (Studio page)
 // Twitch: Helix API + IRC chat with the token from Set-TwitchBotToken.ps1 (TwitchTokenGenerator's client id).
@@ -500,6 +542,22 @@ async function action(body) {
       await obs.req('SetVideoSettings', { fpsNumerator: fps, fpsDenominator: 1 });
       state.video.fps = fps;
       return {};
+    }
+    case 'installUpdate': {
+      if (!state.update) throw new Error('IRL Homekit is already up to date');
+      if (state.stream?.active || state.record?.active) throw new Error('You are live or recording. End the stream first, then update.');
+      // Runs on its own: the installer closes IRL Homekit (and this dashboard), updates it and reopens it.
+      const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', path.join(ROOT, 'scripts', 'Update-IRLHomekit.ps1'), '-Yes'],
+        { detached: true, stdio: 'ignore', windowsHide: true });
+      child.unref();
+      return { note: `Updating to ${state.update.latest}. IRL Homekit closes and reopens in about 2 minutes; this page reconnects by itself.` };
+    }
+    case 'setAutoStart': {
+      const script = path.join(ROOT, 'scripts', 'Install-Shortcuts.ps1');
+      await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-AutoStart', body.on ? 'On' : 'Off', '-OnlyAutoStart'],
+        { windowsHide: true, timeout: 30000 }, (err, stdout, stderr) => err ? reject(new Error((stderr || err.message).split(/\r?\n/).find((l) => l.trim()) || 'failed')) : resolve()));
+      await readAutoStart();
+      return { note: state.autoStart ? 'IRL Homekit opens when the PC signs in.' : 'IRL Homekit stays closed after a restart until someone opens it.' };
     }
     case 'restartService': {
       const exe = SERVICE_EXE[body.service]; if (!exe) throw new Error('unknown service');

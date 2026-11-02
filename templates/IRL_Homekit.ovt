@@ -1,0 +1,52 @@
+/* IRL Homekit skin for OBS Studio.
+ *
+ * A variant of OBS's default Yami theme: same layout and widgets, so OBS still looks and works like OBS, but in
+ * IRL Homekit's colours (red-to-pink accent, warm charcoal background, softer corners) so the IRL Homekit OBS is
+ * never mistaken for your regular one. Installed into the IRL Homekit OBS only; pick another theme any time in
+ * Settings > Appearance.
+ */
+
+@OBSThemeMeta {
+    name: 'IRL Homekit';
+    id: 'com.irlhomekit.Yami.IRLHomekit';
+    extends: 'com.obsproject.Yami';
+    author: 'IRL Homekit';
+    dark: 'true';
+}
+
+@OBSThemeVars {
+    /* Brand accent: the logo's red-to-pink (#FF6A3D -> #FF2D55 -> #D4145A) */
+    --brand1: #FF8FA5;
+    --brand2: #FF4F70;
+    --brand3: #E8264D;
+    --brand4: #C21A40;
+    --brand5: #961433;
+    --brand6: #6A0F25;
+
+    /* Warm charcoal instead of Yami's blue-grey */
+    --grey1: #6A5F66;
+    --grey2: #5A5057;
+    --grey3: #4D444A;
+    --grey4: #41393F;
+    --grey5: #352F34;
+    --grey6: #2A2529;
+    --grey7: #1F1B1E;
+    --grey8: #141114;
+
+    --bg_window: var(--grey7);
+    --bg_base: var(--grey6);
+    --bg_preview: #0E0C0E;
+
+    --primary: var(--brand3);
+    --primary_light: var(--brand2);
+    --primary_lighter: var(--brand1);
+    --primary_dark: var(--brand4);
+    --primary_darker: var(--brand5);
+
+    --highlight_color: var(--brand2);
+
+    /* Softer, Apple-like corners */
+    --border_radius: 6px;
+    --border_radius_small: 4px;
+    --border_radius_large: 10px;
+}

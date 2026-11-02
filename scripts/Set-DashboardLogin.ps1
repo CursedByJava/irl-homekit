@@ -1,5 +1,5 @@
 # Sets the username and password for the remote dashboard and Studio (both use the same login).
-#   Change it:        double-click the "IRL Homekit - Change login" desktop shortcut (or run this script)
+#   Change it:        Start menu > "IRL Homekit - Change login" (or run this script)
 #   Non-interactive:  Set-DashboardLogin.ps1 -Username me -Password '...'
 # Changing the password signs out every device. The dashboard picks up the change by itself; no restart needed.
 param(

@@ -14,14 +14,14 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
    | TCP | 443 + 80 | Remote dashboard (only if you set a domain) |
 
    Also give this PC a **DHCP reservation** so it keeps `{{LAN_IP}}`.
-2. **Automatic sign-in** so everything comes back after a reboot or power cut: Win+R → `netplwiz` → untick
+2. **Automatic sign-in** (optional) so IRL Homekit comes back by itself after a reboot or power cut (it opens when you sign in): Win+R → `netplwiz` → untick
    *"Users must enter a user name and password"* (if the box is missing, first turn off *Settings → Accounts →
    Sign-in options → "only allow Windows Hello sign-in"*).
-3. **OBS stream key**: open OBS → Profile **IRL Homekit** → *Settings → Stream* and check your Twitch key is there.
-4. **Kick / YouTube (optional, free multistream)**: OBS → *Docks → Multiple output* → edit **Kick** / **YouTube**,
+3. **OBS stream key**: open **IRL Homekit** (desktop icon) → in its OBS, *Settings → Stream*: check your Twitch key is there.
+4. **Kick / YouTube (optional, free multistream)**: in the IRL Homekit OBS → *Docks → Multiple output* → edit **Kick** / **YouTube**,
    paste the server + stream key, tick **enabled**. They start and stop together with the main stream.
 5. **Twitch chat commands (optional)**: https://twitchtokengenerator.com → enable only `chat:read` + `chat:edit` →
-   *Generate Token* → authorize → solve the CAPTCHA → double-click the desktop shortcut
+   *Generate Token* → authorize → solve the CAPTCHA → Start menu →
    **"IRL Homekit - Twitch chat token"** and paste the Access + Refresh token.
 6. **Self-test**: `powershell -ExecutionPolicy Bypass -File {{INSTALL_DIR}}\tools\Test-IRLHomekit.ps1`
 
@@ -80,7 +80,7 @@ Signal rules: under **1000 kbps** → *IRL LOW* (banner), under **300 kbps** or 
 
 - One login for both pages. You stay signed in for 30 days on each device; after 5 wrong passwords sign-in
   locks for 15 minutes.
-- **Change your username or password:** double-click the desktop shortcut **IRL Homekit - Change login**. It
+- **Change your username or password:** Start menu → **IRL Homekit - Change login**. It
   signs out every device and updates this file.
 - Tip: open the dashboard on your phone and *Add to Home Screen* for an app icon. Let your phone's password
   manager save the login.
@@ -89,6 +89,8 @@ Signal rules: under **1000 kbps** → *IRL LOW* (banner), under **300 kbps** or 
 
 ## 5. Everyday
 
-Desktop shortcuts: **Status** (what's running, is the phone connected), **Pause** (free OBS for desktop streams),
-**Resume**, **Update scenes**, **Change login**. Logs: `{{INSTALL_DIR}}\logs`. Your public IP today: `{{PUBLIC_IP}}`. If it changes, the Status shortcut tells you what to update (nothing, if you use
+**Open / close:** the **IRL Homekit** desktop icon opens it; closing its OBS window stops everything. It opens by itself
+when you sign in (turn off on the dashboard: Home PC → Start with Windows). Start menu folder *IRL Homekit*:
+**Status**, **Update scenes**, **Import from OBS**, **Twitch chat token**, **Change login**, **Check for updates**,
+**Save diagnostics** (for bug reports), **Uninstall**. IRL Homekit also offers updates by itself when you open it. Logs: `{{INSTALL_DIR}}\logs`. Your public IP today: `{{PUBLIC_IP}}`. If it changes, the Status shortcut tells you what to update (nothing, if you use
 a DuckDNS name with its token, see docs/DOMAIN.md in the repo).

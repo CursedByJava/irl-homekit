@@ -4,7 +4,10 @@
 param(
     [string] $Name = 'IRL Homekit',
     [string] $BaseCollection = '',
+    # Where the IRL Homekit collection is written (IRL Homekit's own OBS) ...
     [string] $ObsConfigDir = "$env:APPDATA\obs-studio",
+    # ... and where -BaseCollection is read from (your normal OBS).
+    [string] $BaseConfigDir = $ObsConfigDir,
     [int] $Width = 1920,
     [int] $Height = 1080,
     # Sources from the base collection to show on top of the IRL scenes (chat, alerts, ...), in that order.
@@ -21,9 +24,10 @@ $dstFile = Join-Path $scenesDir (($Name -replace '[^A-Za-z0-9_\-]', '_') + '.jso
 if ((Test-Path $dstFile) -and -not $Force) { throw "$dstFile already exists (use -Force to overwrite)" }
 
 if ($BaseCollection) {
-    $src = Get-ChildItem $scenesDir -Filter *.json | Where-Object {
+    $baseDir = Join-Path $BaseConfigDir 'basic\scenes'
+    $src = Get-ChildItem $baseDir -Filter *.json | Where-Object {
         try { (Get-Content $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json).name -eq $BaseCollection } catch { $false } } | Select-Object -First 1
-    if (-not $src) { throw "No OBS scene collection named '$BaseCollection' in $scenesDir" }
+    if (-not $src) { throw "No OBS scene collection named '$BaseCollection' in $baseDir" }
     $j = Get-Content $src.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
 } else {
     $j = Get-Content (Join-Path $PSScriptRoot '..\templates\blank-collection.json') -Raw | ConvertFrom-Json

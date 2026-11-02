@@ -16,7 +16,7 @@ function dashboard() {
   // Signal thresholds match NOALBS: under 1000 kbps = LOW scene, under 300 kbps = BRB scene.
   const LOW = 1000, OFFLINE = 300, METER_MAX = 8000;
   const SERVICE_INFO = {
-    obs: ['OBS Studio', 'Mixes your scenes and sends the stream to Twitch, Kick and YouTube.'],
+    obs: ['IRL Homekit OBS', 'Mixes your scenes and sends the stream to Twitch, Kick and YouTube.'],
     'go-irl': ['Bonded receiver (go-irl)', 'Receives the bonded 5G + Wi-Fi signal from IRL Pro.'],
     mediamtx: ['Backup receiver (MediaMTX)', 'Receives the backup SRT/RTMP connection.'],
     noalbs: ['Auto-switcher (NOALBS)', 'Switches LIVE / LOW / BRB scenes based on your signal.'],
@@ -94,7 +94,7 @@ function dashboard() {
 
   // ---------- rendering
   function render() {
-    renderTop(); renderSignal(); renderStream(); renderScenes(); renderAudio(); renderServices(); renderHistory();
+    renderTop(); renderSignal(); renderStream(); renderScenes(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
   }
 
   function renderTop() {
@@ -210,14 +210,32 @@ function dashboard() {
     }));
   }
 
+  let updKey = '';
+  function renderUpdate() {
+    const u = s.update, key = JSON.stringify(u) + s.version;
+    if (key === updKey) return; updKey = key;
+    const beta = /-/.test(s.version || '');
+    const vl = $('versionLine'); vl.replaceChildren();
+    if (s.version) { vl.append('IRL Homekit ' + s.version); if (beta) vl.append(el('span', 'badge-beta', 'Beta')); }
+    const b = $('updateBanner');
+    if (!u) { b.classList.remove('show'); return; }
+    $('updateTitle').textContent = 'IRL Homekit ' + u.latest + ' is available.';
+    $('updateText').textContent = ' You have ' + s.version + '. Updating takes about 2 minutes and keeps all your settings.';
+    $('updateNotes').href = u.url; b.classList.add('show');
+  }
+
   let svcKey = '';
   function renderServices() {
-    const sv = s.services || {}; const key = JSON.stringify(sv) + s.paused + JSON.stringify(s.stats);
+    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats);
     if (key === svcKey) return; svcKey = key;
     const down = Object.keys(SERVICE_INFO).filter((k) => sv[k] === false);
     const st = s.stats || {};
-    $('pcSummary').textContent = s.paused ? 'IRL Homekit is paused on the PC (the Pause shortcut was used). Run "IRL Homekit - Resume" on the PC to turn it back on.'
-      : down.length ? down.length + ' part' + (down.length > 1 ? 's are' : ' is') + ' not running. The watchdog restarts them within 10–30 seconds.'
+    const as = $('autoStart');
+    as.classList.toggle('muted', !s.autoStart); as.textContent = s.autoStart ? 'On' : 'Off'; as.setAttribute('aria-pressed', String(!!s.autoStart));
+    $('autoStartDesc').textContent = s.autoStart
+      ? 'IRL Homekit opens by itself (minimized) when the PC signs in, so this page is always reachable.'
+      : 'Off: after a restart, IRL Homekit (and this page) stays closed until someone opens it on the PC.';
+    $('pcSummary').textContent = down.length ? down.length + ' part' + (down.length > 1 ? 's are' : ' is') + ' not running. IRL Homekit restarts them within 10–30 seconds.'
       : 'Everything is running.' + (st.cpu != null ? ' OBS: ' + st.cpu + '% CPU, ' + st.fps + ' fps.' : '');
     const hb = $('healthBanner');
     if (st.renderSkipped > 0 && s.stream.active && st.fps && st.fps < 55) { hb.innerHTML = '<b>The home PC is struggling.</b> OBS is rendering at ' + st.fps + ' fps instead of 60. Close other programs on the PC.'; hb.classList.add('show'); }
@@ -280,6 +298,18 @@ function dashboard() {
     b.onclick = () => { if (!b.classList.contains('on')) act({ action: 'setFps', fps: Number(b.dataset.fps) }, 'Frame rate set to ' + b.dataset.fps + ' fps.', 'Applies to your next stream on all platforms.'); };
   }
   $('recBtn').onclick = () => act({ action: s.record.active ? 'stopRecord' : 'startRecord' }, s.record.active ? 'Recording stopped.' : 'Recording started.');
+  $('updateBtn').onclick = async () => {
+    if (!s.update) return;
+    const yes = await confirmBox('Update to ' + s.update.latest + '?', 'IRL Homekit closes on the PC, updates and reopens by itself in about 2 minutes. This page goes offline meanwhile, then reconnects. Your settings, stream keys and passwords are kept.', 'Update now', 'Not now');
+    if (yes) act({ action: 'installUpdate' }, 'Updating IRL Homekit…', 'It reopens in about 2 minutes; this page reconnects by itself.');
+  };
+  $('autoStart').onclick = async () => {
+    if (s.autoStart) {
+      const yes = await confirmBox('Stop starting with Windows?', 'After the PC restarts, IRL Homekit and this page stay offline until someone opens IRL Homekit on the PC.', 'Turn off', 'Keep on');
+      if (!yes) return;
+    }
+    act({ action: 'setAutoStart', on: !s.autoStart }, s.autoStart ? 'IRL Homekit no longer starts with Windows.' : 'IRL Homekit now starts with Windows.');
+  };
   document.querySelectorAll('[data-action]').forEach((b) => {
     b.onclick = () => act({ action: b.dataset.action }, b.dataset.action === 'restartPhoneFeed' ? 'Phone feed reloaded.' : 'Overlays reloaded.');
   });

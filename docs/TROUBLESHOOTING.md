@@ -1,12 +1,12 @@
 # Troubleshooting
 
-Start with the **IRL Homekit - Status** desktop shortcut and the dashboard's *Home PC* card. Logs are in
+Start with **IRL Homekit - Status** (Start menu) and the dashboard's *Home PC* card. Logs are in
 `C:\IRLHomekit\logs`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Phone says connected, OBS stays on BRB | Router not forwarding UDP 5000, or wrong passphrase | Check `ROUTER.md`; compare the passphrase in IRL Pro with `PHONE-SETUP.md`; look in `logs\go-irl.err.log` for `Registered` lines |
-| IRL Pro can't connect at all | Public IP changed, or Windows Firewall blocking | Status shortcut shows your current IP; re-run `install.ps1` (as admin) to recreate firewall rules |
+| IRL Pro can't connect at all | IRL Homekit closed, public IP changed, or Windows Firewall blocking | Make sure IRL Homekit is open; the Status shortcut shows your current IP; re-run `install.ps1` (as admin) to recreate firewall rules |
 | Works on Wi-Fi at home, not on mobile data | Testing via your own Wi-Fi doesn't prove forwarding | Test with Wi-Fi off; check the router rules |
 | Video frozen but stats look fine | OBS media source stuck | Dashboard → *Quick fixes → Reload feed* |
 | Never switches to LIVE, NOALBS log silent | OBS WebSocket off or wrong password | OBS → *Tools → WebSocket Server Settings*: enabled, port 4455, password = `obsWebsocketPassword` in `secrets.json` |
@@ -23,6 +23,17 @@ powershell -ExecutionPolicy Bypass -File C:\IRLHomekit\tools\Test-IRLHomekit.ps1
 Sends fake phone streams (backup, low bitrate, bonded SRTLA) into the PC and checks OBS switches scenes. It never
 starts your real stream.
 
-## Turning it off for a desktop stream
-*IRL Homekit - Pause* stops the receivers and keeps the watchdog from reopening OBS, so you can switch OBS to your
-normal profile. *IRL Homekit - Resume* turns it back on.
+## Doing a desktop stream
+Your regular OBS is separate from IRL Homekit's, so just use it. Close the IRL Homekit OBS window first so the two
+don't compete for your graphics card (and so IRL Homekit's auto-switcher isn't running). Open IRL Homekit again
+from the desktop icon afterwards.
+
+## The IRL Homekit OBS
+| Symptom | Fix |
+|---|---|
+| Dashboard offline after a restart | *Start with Windows* is off (dashboard: Home PC), or nobody signed in to Windows. Open IRL Homekit from the desktop icon, or set up auto sign-in (`PHONE-SETUP.md`). |
+| Clicking the icon does nothing | It's already running, hidden in the tray: the click brings the window back. If not, open Task Scheduler and run the *IRL Homekit* task; if it's missing, run the installer again. |
+| Can't drag files into the IRL Homekit OBS | It runs as administrator, and Windows blocks drag-and-drop into admin apps. Use **+** in Sources. |
+| A plugin from your regular OBS is missing | Start menu → *IRL Homekit - Import from OBS*. Plugins only copy over when both OBS versions match; otherwise install the plugin into `C:\IRLHomekit\obs`. |
+| Want the normal OBS look back | In the IRL Homekit OBS: *Settings → Appearance → Theme*. |
+| Something's wrong after an import | The previous settings are in `C:\IRLHomekit\obs-config-backup\<date>`: close IRL Homekit and copy them back into `C:\IRLHomekit\obs\config\obs-studio`. |

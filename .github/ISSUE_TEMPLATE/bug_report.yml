@@ -1,0 +1,50 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make IRL Homekit better! It's in beta, so reports like this really help.
+        **Never paste passwords, stream keys or tokens.** The diagnostics zip below already removes them.
+  - type: input
+    id: version
+    attributes:
+      label: IRL Homekit version
+      description: Shown on the dashboard (Home PC card) and in Settings > Apps.
+      placeholder: 1.0.0-beta.1
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Installer / updating
+        - Opening or closing the app
+        - Phone connection (IRL Pro / Moblin / BELABOX)
+        - Auto scene switching (LIVE / LOW / BRB)
+        - Multistreaming (Twitch / Kick / YouTube)
+        - Dashboard
+        - Studio (chat, title, category)
+        - Domain / HTTPS
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and streaming app
+      placeholder: Galaxy S26 Ultra, IRL Pro
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: On the PC, Start menu > "IRL Homekit - Save diagnostics", then drag the zip from your desktop into this box.

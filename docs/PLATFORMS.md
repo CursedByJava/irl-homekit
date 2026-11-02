@@ -15,7 +15,7 @@ Twitch's go-live notification text can't be changed by any outside tool; Studio 
 ## Twitch
 1. https://twitchtokengenerator.com → enable only **chat:read**, **chat:edit**, **channel:manage:broadcast** →
    *Generate Token* → *Authorize* → solve the CAPTCHA.
-2. Double-click **IRL Homekit - Twitch chat token** on the desktop and paste the Access and Refresh tokens.
+2. Start menu → **IRL Homekit - Twitch chat token**, and paste the Access and Refresh tokens.
 
 ## Kick (about 3 minutes)
 1. kick.com → **Settings → Developer → Create new**.

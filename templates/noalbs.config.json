@@ -31,7 +31,7 @@
     "type": "Obs",
     "host": "127.0.0.1",
     "password": "{{OBS_WS_PASSWORD}}",
-    "port": 4455
+    "port": "{{OBS_WS_PORT}}"
   },
   "chat": null,
   "optionalScenes": { "starting": "{{STARTING_SCENE}}", "ending": "{{ENDING_SCENE}}", "privacy": null, "refresh": null },

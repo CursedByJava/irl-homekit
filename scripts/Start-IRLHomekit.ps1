@@ -1,19 +1,79 @@
-# IRL Homekit watchdog. Started at logon by the "IRL Homekit" scheduled task.
-# Keeps OBS (IRL Homekit profile), MediaMTX, go-irl, NOALBS, the dashboard and Caddy running; restarts anything that dies.
-# Create a PAUSE file in the install folder to stop it relaunching things (Pause-IRLHomekit.ps1 does this).
+# IRL Homekit app. The "IRL Homekit" shortcut (Start menu / desktop) runs this as administrator through the
+# "IRL Homekit" Windows task; with "Start with Windows" on, the "IRL Homekit (sign-in)" task runs it with
+# -Background (OBS starts minimized to the tray). See Install-Shortcuts.ps1.
+#
+# It opens IRL Homekit's own copy of OBS (separate from your normal OBS) and keeps MediaMTX, go-irl, NOALBS, the
+# dashboard and Caddy running, restarting anything that crashes. When you close the IRL Homekit OBS window,
+# everything stops. Opening the shortcut again while it's running just brings the OBS window back.
+param([switch] $Background)
 $ErrorActionPreference = 'Continue'
 $root = Split-Path $PSScriptRoot -Parent
 $logs = "$root\logs"
-$pauseFlag = "$root\PAUSE"
 $secrets = Get-Content "$root\secrets.json" -Raw | ConvertFrom-Json
 $settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
 $obsDir = $settings.obsDir
+$obsExe = Join-Path $obsDir 'obs64.exe'
 $node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
 
-# Only one watchdog at a time.
-$mutex = New-Object System.Threading.Mutex($false, 'Global\IRLHomekitWatchdog')
-if (-not $mutex.WaitOne(0)) { exit 0 }
+Add-Type -Namespace IRLHK -Name Win -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+public delegate bool EnumProc(IntPtr h, IntPtr l);
+[DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool SetWindowText(IntPtr h, string s);
+[DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr LoadImage(IntPtr inst, string name, int type, int cx, int cy, int flags);
+'@
+
+# Only IRL Homekit's own OBS counts; your normal OBS can run at the same time.
+function Get-IrlObs { Get-Process -Name obs64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $obsExe } }
+
+# The main OBS window (not a dock or helper window), even while it's hidden in the tray.
+function Get-IrlObsWindow {
+    $p = Get-IrlObs | Select-Object -First 1; if (-not $p) { return [IntPtr]::Zero }
+    $script:found = [IntPtr]::Zero
+    [IRLHK.Win]::EnumWindows({ param($h, $l)
+        $wpid = 0; [void][IRLHK.Win]::GetWindowThreadProcessId($h, [ref]$wpid)
+        if ($wpid -eq $p.Id -and $script:found -eq [IntPtr]::Zero) {
+            $sb = New-Object System.Text.StringBuilder 256; [void][IRLHK.Win]::GetWindowText($h, $sb, 256)
+            if ($sb.ToString() -like 'OBS *' -or $sb.ToString() -like 'IRL Homekit*') { $script:found = $h }
+        }
+        $true }, [IntPtr]::Zero) | Out-Null
+    $script:found
+}
+
+function Show-IrlObs {
+    $h = Get-IrlObsWindow
+    if ($h -ne [IntPtr]::Zero) { [void][IRLHK.Win]::ShowWindow($h, 9); [void][IRLHK.Win]::SetForegroundWindow($h) }
+}
+
+# Our logo on the window (title bar, taskbar, Alt+Tab) and "IRL Homekit" as its name, so it's never mistaken for
+# your regular OBS. OBS resets the title when you switch profile or scene collection, so this is re-applied.
+$iconFile = Join-Path $root 'dashboard\public\icon.ico'
+$script:brandedFor = [IntPtr]::Zero
+function Set-IrlBranding {
+    $h = Get-IrlObsWindow; if ($h -eq [IntPtr]::Zero) { return }
+    $sb = New-Object System.Text.StringBuilder 512; [void][IRLHK.Win]::GetWindowText($h, $sb, 512); $title = $sb.ToString()
+    if ($title -like 'OBS *') {
+        # "OBS 33.0.1 - Portable Mode - Profile: IRL Homekit - Scenes: IRL Homekit" -> "IRL Homekit - Profile: ... - Scenes: ..."
+        [void][IRLHK.Win]::SetWindowText($h, ('IRL Homekit' + ($title -replace '^OBS [^-]*(- Portable Mode )?', ' ')).Replace('  ', ' '))
+    }
+    if ($script:brandedFor -ne $h -and (Test-Path $iconFile)) {
+        $big = [IRLHK.Win]::LoadImage([IntPtr]::Zero, $iconFile, 1, 48, 48, 0x10)
+        $small = [IRLHK.Win]::LoadImage([IntPtr]::Zero, $iconFile, 1, 16, 16, 0x10)
+        [void][IRLHK.Win]::SendMessage($h, 0x80, [IntPtr]1, $big)     # WM_SETICON, ICON_BIG
+        [void][IRLHK.Win]::SendMessage($h, 0x80, [IntPtr]0, $small)   # WM_SETICON, ICON_SMALL
+        $script:brandedFor = $h
+    }
+}
+
+# Only one copy at a time. A second launch (someone opened the shortcut again) just shows the OBS window.
+$mutexName = 'Global\IRLHomekit-' + [BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($root.ToLower()))).Replace('-', '').Substring(0, 12)
+$mutex = New-Object System.Threading.Mutex($false, $mutexName)
+if (-not $mutex.WaitOne(0)) { if (-not $Background) { Show-IrlObs }; exit 0 }
 
 function Log($msg) {
     $line = '{0}  {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg
@@ -46,8 +106,9 @@ function Rotate-MediamtxLog {
 }
 
 # The dashboard runs on node.exe, which other apps may also use, so check its port instead of the process name.
+function Get-DashboardPid { (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess }
 function Ensure-Dashboard {
-    if (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue) { return }
+    if (Get-DashboardPid) { return }
     Rotate "$logs\dashboard.out.log"; Rotate "$logs\dashboard.err.log"
     Log 'starting dashboard'
     try {
@@ -56,16 +117,33 @@ function Ensure-Dashboard {
     } catch { Log "failed to start dashboard: $_" }
 }
 
-function Ensure-Obs {
-    if (Get-Process -Name obs64 -ErrorAction SilentlyContinue) { return }
-    Log "starting OBS (profile '$($settings.obsProfile)', collection '$($settings.obsCollection)')"
-    # After a crash OBS leaves a run_* marker in .sentinel and, on the next start, waits on a "Crash Detected -
-    # run in Safe Mode?" dialog that would block an unattended restart. OBS isn't running here, so any marker is stale.
-    Get-ChildItem "$env:APPDATA\obs-studio\.sentinel" -Filter 'run_*' -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-    Start-Process -FilePath "$obsDir\obs64.exe" -WorkingDirectory $obsDir -ArgumentList @(
-        '--profile', "`"$($settings.obsProfile)`"", '--collection', "`"$($settings.obsCollection)`"",
-        '--scene', '"IRL BRB"', '--disable-missing-files-check', '--minimize-to-tray')
+# OBS exits with code 0 when you close it; anything else (a crash) gets it restarted.
+$script:obsProc = $null
+function Start-IrlObs([switch] $Minimized) {
+    Log "starting IRL Homekit OBS (profile '$($settings.obsProfile)', collection '$($settings.obsCollection)')"
+    $a = @('--portable', '--multi', '--profile', "`"$($settings.obsProfile)`"", '--collection', "`"$($settings.obsCollection)`"",
+        '--scene', '"IRL BRB"', '--disable-missing-files-check')
+    if ($Minimized) { $a += '--minimize-to-tray' }
+    $script:obsProc = Start-Process -FilePath $obsExe -WorkingDirectory $obsDir -ArgumentList $a -PassThru
+    $null = $script:obsProc.Handle   # keep a handle so the exit code can be read later
     Start-Sleep -Seconds 15
+}
+function Test-ObsCrashed {
+    if (-not $script:obsProc) { return $false }   # OBS was already open when IRL Homekit started: treat as closed by you
+    try { $code = $script:obsProc.ExitCode } catch { return $false }
+    if ($code -ne 0) { Log ("IRL Homekit OBS exited with code 0x{0:X8}" -f $code) }
+    $code -ne 0
+}
+
+function Stop-Everything {
+    Log 'IRL Homekit OBS was closed; stopping everything'
+    # Only this install's copies.
+    Get-Process -Name noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\*" } |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    $d = Get-DashboardPid
+    if ($d -and (Get-CimInstance Win32_Process -Filter "ProcessId=$d").CommandLine -like "*$root\dashboard\server.mjs*") {
+        Stop-Process -Id $d -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # Free DuckDNS name (docs/DOMAIN.md): point it at this PC's current home IP. Logged only when the answer changes.
@@ -75,11 +153,23 @@ function Update-DuckDns {
     if ($r -ne $script:lastDuck) { Log "DuckDNS update for $($settings.duckdnsName).duckdns.org: $r"; $script:lastDuck = $r }
 }
 
-Log 'watchdog started'
+Log $(if ($Background) { 'IRL Homekit started at sign-in' } else { 'IRL Homekit opened' })
+if (-not (Get-IrlObs)) { Start-IrlObs -Minimized:$Background } elseif (-not $Background) { Show-IrlObs }
+# Look for a newer IRL Homekit (at most once a day); if there is one, Windows shows an "Update now?" box.
+$stamp = "$logs\update-check.txt"
+if (-not (Test-Path $stamp) -or (Get-Item $stamp).LastWriteTime -lt (Get-Date).AddHours(-20)) {
+    Set-Content $stamp (Get-Date -Format o)
+    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$root\scripts\Update-IRLHomekit.ps1`" -Prompt"
+}
 $nextTokenCheck = Get-Date
 $nextDuck = Get-Date
 while ($true) {
   try {
+    if (-not (Get-IrlObs)) {
+        if (Test-ObsCrashed) { Log 'IRL Homekit OBS crashed; restarting it'; Start-IrlObs -Minimized }
+        else { Stop-Everything; break }
+    }
+    Set-IrlBranding
     if ((Get-Date) -ge $nextTokenCheck) {
         $nextTokenCheck = (Get-Date).AddHours(1)
         Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$root\scripts\Refresh-TwitchToken.ps1`""
@@ -88,15 +178,11 @@ while ($true) {
         $nextDuck = (Get-Date).AddMinutes(5)
         Update-DuckDns
     }
-    if (-not (Test-Path $pauseFlag)) {
-        Ensure-Obs
-        Rotate-MediamtxLog
-        Ensure 'mediamtx' "$root\mediamtx\mediamtx.exe" @("$root\mediamtx\mediamtx.yml") "$root\mediamtx"
-        Ensure 'go-irl' "$root\go-irl\go-irl.exe" @('-cli', '-mode=standalone', '-srtla-port=5000', '-udp-port=5002',
-            '-ws-port=8888', '-bs-port=9999', "-passphrase=$($secrets.goirlPassphrase)") "$root\go-irl"
-        Ensure 'noalbs' "$root\noalbs\noalbs.exe" $null "$root\noalbs"
-    }
-    # The dashboard (and Caddy, which serves it over HTTPS) stays up even while paused, so you can see that it is paused.
+    Rotate-MediamtxLog
+    Ensure 'mediamtx' "$root\mediamtx\mediamtx.exe" @("$root\mediamtx\mediamtx.yml") "$root\mediamtx"
+    Ensure 'go-irl' "$root\go-irl\go-irl.exe" @('-cli', '-mode=standalone', '-srtla-port=5000', '-udp-port=5002',
+        '-ws-port=8888', '-bs-port=9999', "-passphrase=$($secrets.goirlPassphrase)") "$root\go-irl"
+    Ensure 'noalbs' "$root\noalbs\noalbs.exe" $null "$root\noalbs"
     Ensure-Dashboard
     if (Test-Path "$root\caddy\Caddyfile") {
         Ensure 'caddy' "$root\caddy\caddy.exe" @('run', '--config', "$root\caddy\Caddyfile", '--adapter', 'caddyfile') "$root\caddy"
@@ -105,5 +191,6 @@ while ($true) {
     # Never let one bad check stop the watchdog; log it and keep going.
     Log "watchdog error: $($_.Exception.Message) at line $($_.InvocationInfo.ScriptLineNumber)"
   }
-    Start-Sleep -Seconds 10
+    Start-Sleep -Seconds 5
 }
+Log 'IRL Homekit closed'

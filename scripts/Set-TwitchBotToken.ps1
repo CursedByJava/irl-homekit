@@ -3,7 +3,7 @@
 #    with the account that should reply in chat (your own account is fine).
 # 2. Run:  powershell -ExecutionPolicy Bypass -File C:\IRLHomekit\scripts\Set-TwitchBotToken.ps1 -BotUsername <login> -Token <access token> -RefreshToken <refresh token>
 # The watchdog then refreshes the token automatically (scripts\Refresh-TwitchToken.ps1).
-#    Or just double-click the "IRL Homekit - Twitch chat token" desktop shortcut and paste when asked.
+#    Or just open Start menu > "IRL Homekit - Twitch chat token" and paste when asked.
 param([string] $BotUsername, [string] $Token, [string] $RefreshToken)
 $ErrorActionPreference = 'Stop'
 $channel = (Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'settings.json') -Raw | ConvertFrom-Json).twitchChannel

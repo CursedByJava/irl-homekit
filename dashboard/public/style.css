@@ -118,6 +118,11 @@ b, strong { font-weight: 600; }
 .banner.warn { background: var(--orange-tint); color: var(--label); }
 .banner b { color: inherit; }
 .banner.error b { color: var(--red); } .banner.warn b { color: var(--orange); }
+.banner.info { background: var(--fill-2); color: var(--label); align-items: center; gap: 10px; flex-wrap: wrap; }
+.banner.info.show { display: flex; }
+.banner.info .grow { flex: 1 1 200px; } .banner.info b { color: var(--blue); margin-right: 6px; }
+.badge-beta { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 650;
+  letter-spacing: .02em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg, #FF6A3D, #FF2D55); vertical-align: 1px; }
 
 /* ---------- layout */
 main { padding: 20px 16px 48px; display: grid; gap: 20px; max-width: 1120px; margin: 0 auto; }

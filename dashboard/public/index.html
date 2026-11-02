@@ -28,6 +28,11 @@
 
   <div class="banner error" id="linkBanner" role="alert"></div>
   <div class="banner warn" id="healthBanner" role="status"></div>
+  <div class="banner info" id="updateBanner" role="status">
+    <div class="grow"><b id="updateTitle">Update available</b><span id="updateText"></span></div>
+    <a class="btn small ghost" id="updateNotes" target="_blank" rel="noopener">What's new</a>
+    <button class="btn small go" id="updateBtn">Update</button>
+  </div>
 
   <main>
     <!-- Phone signal -->
@@ -122,6 +127,14 @@
       <h2 id="healthTitle">Home PC</h2>
       <p class="sub" id="pcSummary">Checking…</p>
       <div class="list" id="services"></div>
+      <div class="list">
+        <div class="item">
+          <div class="grow"><div class="title">Start with Windows</div>
+            <div class="desc" id="autoStartDesc">Opens IRL Homekit (minimized) when the PC signs in, so this page is always reachable.</div></div>
+          <button class="toggle muted" id="autoStart" aria-pressed="false" title="Start with Windows">Off</button>
+        </div>
+      </div>
+      <p class="foot" id="versionLine"></p>
     </section>
 
     <!-- Auto-switch history -->

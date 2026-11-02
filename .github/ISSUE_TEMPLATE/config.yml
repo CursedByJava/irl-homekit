@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Setup help
+    url: https://github.com/CursedByJava/irl-homekit/blob/main/docs/TROUBLESHOOTING.md
+    about: Common problems and fixes (ports, phone connection, domain, OBS).
+  - name: Security problem
+    url: https://github.com/CursedByJava/irl-homekit/security/advisories/new
+    about: Please report security issues privately, not as a public issue.

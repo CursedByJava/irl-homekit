@@ -4,12 +4,13 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $s = Get-Content "$root\secrets.json" -Raw | ConvertFrom-Json
+$port = (Get-Content "$root\settings.json" -Raw | ConvertFrom-Json).obsWebsocketPort; if (-not $port) { $port = 4455 }
 $tmp = Join-Path $env:TEMP 'irlhk-test'; New-Item -ItemType Directory -Force $tmp | Out-Null
 if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { throw 'ffmpeg not found. Install it with: winget install Gyan.FFmpeg (then open a new PowerShell).' }
 
 function Get-ObsScene {
     $ws = New-Object System.Net.WebSockets.ClientWebSocket
-    $ws.ConnectAsync([uri]'ws://127.0.0.1:4455', [Threading.CancellationToken]::None).Wait()
+    $ws.ConnectAsync([uri]"ws://127.0.0.1:$port", [Threading.CancellationToken]::None).Wait()
     $recv = { $buf = New-Object byte[] 65536; $seg = New-Object ArraySegment[byte] (, $buf)
         $r = $ws.ReceiveAsync($seg, [Threading.CancellationToken]::None).Result; [Text.Encoding]::UTF8.GetString($buf, 0, $r.Count) | ConvertFrom-Json }
     $send = { param($o) $b = [Text.Encoding]::UTF8.GetBytes(($o | ConvertTo-Json -Depth 5 -Compress)); $ws.SendAsync((New-Object ArraySegment[byte] (, $b)), 'Text', $true, [Threading.CancellationToken]::None).Wait() }

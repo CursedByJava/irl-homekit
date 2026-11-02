@@ -6,11 +6,15 @@ $settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
 Write-Host "`n== Processes" -ForegroundColor Cyan
 $names = @('obs64', 'mediamtx', 'go-irl', 'noalbs'); if (Test-Path "$root\caddy\Caddyfile") { $names += 'caddy' }
 foreach ($p in $names) {
-    $proc = Get-Process -Name $p -ErrorAction SilentlyContinue
-    if ($proc) { Write-Host ("  OK    {0,-9} running since {1}" -f $p, $proc[0].StartTime) -ForegroundColor Green }
-    else { Write-Host ("  DOWN  {0}" -f $p) -ForegroundColor Red }
+    # Only IRL Homekit's own OBS counts (your normal OBS may be open too).
+    $proc = Get-Process -Name $p -ErrorAction SilentlyContinue | Where-Object { $p -ne 'obs64' -or $_.Path -eq (Join-Path $settings.obsDir 'obs64.exe') }
+    $label = if ($p -eq 'obs64') { 'IRL OBS' } else { $p }
+    if ($proc) { Write-Host ("  OK    {0,-9} running since {1}" -f $label, @($proc)[0].StartTime) -ForegroundColor Green }
+    else { Write-Host ("  DOWN  {0}" -f $label) -ForegroundColor Red }
 }
-if (Test-Path "$root\PAUSE") { Write-Host '  PAUSED (run Resume-IRLHomekit.ps1)' -ForegroundColor Yellow }
+if (-not (Get-Process obs64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $settings.obsDir 'obs64.exe') })) {
+    Write-Host '  IRL Homekit is closed. Open it from the Start menu or the desktop icon "IRL Homekit".' -ForegroundColor Yellow
+}
 
 Write-Host "`n== Phone connection" -ForegroundColor Cyan
 try {
