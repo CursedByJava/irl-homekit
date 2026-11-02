@@ -31,7 +31,7 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Free HTTPS on your own domain | [Caddy](https://caddyserver.com) + Let's Encrypt |
 | ✅ | Runs 24/7, restarts anything that crashes, survives reboots | watchdog + logon task |
 
-Cost: $0/month. Uses your home upload (about 8 Mbps per platform).
+Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Support the project](#support-the-project).
 
 ## Requirements
 
@@ -39,7 +39,8 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform).
 - [OBS Studio](https://obsproject.com) 30 or newer
 - [Node.js](https://nodejs.org) 22 or newer: `winget install OpenJS.NodeJS.LTS`
 - A home connection with a **public IPv4** you can port-forward (most fiber/cable; not CGNAT, see [ROUTER.md](docs/ROUTER.md))
-- Optional: a domain or subdomain for the dashboard (any DNS provider, one A record)
+- Optional: a domain for the dashboard. Don't have one? Get a **free** name from DuckDNS or your own for about
+  $10/year: [docs/DOMAIN.md](docs/DOMAIN.md) walks you through both
 - Optional for the self-test: ffmpeg, `winget install Gyan.FFmpeg`
 
 ## Install
@@ -51,7 +52,8 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform).
    powershell -ExecutionPolicy Bypass -File .\install.ps1
    ```
    It asks for your Twitch channel, which existing OBS scene collection/profile to copy (optional), which browser
-   sources (chat, alerts) to show on the IRL scenes, and a dashboard domain (optional).
+   sources (chat, alerts) to show on the IRL scenes, a dashboard domain (optional, see
+   [DOMAIN.md](docs/DOMAIN.md)), and a username and password for the dashboard.
 4. Open `C:\IRLHomekit\PHONE-SETUP.md`. It has **your** IRL Pro settings, passwords and the last manual steps:
    - Router port forwarding ([ROUTER.md](docs/ROUTER.md))
    - Windows auto sign-in
@@ -59,14 +61,25 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform).
 5. Run the self-test: `powershell -ExecutionPolicy Bypass -File C:\IRLHomekit\tools\Test-IRLHomekit.ps1`
 6. Go live from your phone with Wi-Fi off to prove it works from outside.
 
-Installer options (all optional): `-InstallDir`, `-TwitchChannel`, `-Domain`, `-BaseCollection`, `-BaseProfile`,
-`-OverlaySources "Chat,Alerts"`, `-BrbBackground "<media source>"`, `-ObsName`, `-ObsDir`, `-NonInteractive`.
-Re-running is safe and keeps your passwords.
+Installer options (all optional): `-InstallDir`, `-TwitchChannel`, `-Domain`, `-DashboardUser`, `-BaseCollection`,
+`-BaseProfile`, `-DuckDnsName`, `-DuckDnsToken`, `-OverlaySources "Chat,Alerts"`, `-BrbBackground "<media source>"`, `-ObsName`, `-ObsDir`,
+`-NonInteractive`. Re-running is safe and keeps your passwords.
+
+## Signing in
+
+One login opens both the dashboard and Studio.
+
+- **First install:** the installer asks you for a username (default: your Twitch channel) and a password. Press
+  Enter at the password prompt and it makes a strong one for you. You'll see the login at the end of the install,
+  and it's saved in `C:\IRLHomekit\PHONE-SETUP.md`.
+- **Sign in:** open your dashboard address on your phone, type the login, and let your password manager save it.
+  You stay signed in for 30 days on each device.
+- **Change it or forgot it:** on the PC, double-click the desktop shortcut **IRL Homekit - Change login**. Pick a
+  new username/password; every device is signed out and `PHONE-SETUP.md` is updated. No restart needed.
 
 ## Dashboard
 
-`https://your-domain` (or `http://localhost:8090` on the PC). Sign in with the user and password from
-`PHONE-SETUP.md`. Mobile-first and readable outdoors:
+`https://your-domain` (or `http://localhost:8090` on the PC). Mobile-first and readable outdoors:
 
 - **Phone signal:** bitrate, latency, packet loss, each bonded link, which input is active, in plain words ("Weak: viewers see the LOW SIGNAL banner")
 - **Stream:** live preview, uptime, outgoing bitrate, dropped frames, live outputs, Start/End with confirmation,
@@ -112,6 +125,18 @@ installer creates new ones named *IRL Homekit*.
 ## Troubleshooting
 
 See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
+## Support the project
+
+IRL Homekit is free and always will be. If it saves you a monthly bill and you'd like to say thanks, you can chip
+in here. Every bit helps keep it maintained.
+
+| | |
+|---|---|
+| ☕ Ko-fi | [ko-fi.com/cursedbyjava](https://ko-fi.com/cursedbyjava) |
+| 💖 GitHub Sponsors | [github.com/sponsors/CursedByJava](https://github.com/sponsors/CursedByJava) |
+| 💵 Cash App | [$DigitalContentSpace](https://cash.app/$DigitalContentSpace) |
+Not in a position to give? A ⭐ on the repo or sharing it with another IRL streamer helps just as much.
 
 ## Credits
 

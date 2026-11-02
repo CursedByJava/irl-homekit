@@ -297,6 +297,13 @@ dialog .actions .btn.ghost { background: var(--fill); color: var(--label); }
 .login .err b { color: var(--red); }
 .login .err.show { display: block; animation: rise .3s var(--ease); }
 .foot { margin-top: 16px; font-size: 13px; color: var(--label-3); }
+.forgot { margin-top: 12px; font-size: 13px; }
+.forgot summary { list-style: none; cursor: pointer; color: var(--blue); font-weight: 500; display: inline-block; padding: 6px 8px; border-radius: 8px; }
+.forgot summary::-webkit-details-marker { display: none; }
+.forgot summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.forgot[open] summary { color: var(--label-2); }
+.login .forgot p { margin: 8px 0 0; padding: 12px 14px; border-radius: var(--radius-m); background: var(--fill-2); color: var(--label-2); font-size: 13px; line-height: 1.45; text-align: left; animation: rise .3s var(--ease); }
+.login .forgot b { color: var(--label); font-weight: 600; }
 
 /* ---------- studio */
 .platform .pname { color: var(--pc, var(--label)); font-weight: 700; }

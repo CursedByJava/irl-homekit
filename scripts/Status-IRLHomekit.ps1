@@ -1,6 +1,7 @@
 # IRL Homekit status: what is running, whether the phone is connected, and the phone settings.
 $root = Split-Path $PSScriptRoot -Parent
 $s = Get-Content "$root\secrets.json" -Raw | ConvertFrom-Json
+$settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
 
 Write-Host "`n== Processes" -ForegroundColor Cyan
 $names = @('obs64', 'mediamtx', 'go-irl', 'noalbs'); if (Test-Path "$root\caddy\Caddyfile") { $names += 'caddy' }
@@ -22,7 +23,9 @@ if ($goirl) { Write-Host '  go-irl last log lines:'; $goirl | ForEach-Object { "
 Write-Host "`n== Public IP" -ForegroundColor Cyan
 try {
     $ip = (Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 5).Trim()
-    if ($ip -ne $s.publicIp) { Write-Host "  CHANGED: now $ip (phone settings use $($s.publicIp)) - update IRL Pro or set up DuckDNS" -ForegroundColor Yellow }
+    $duck = if ($settings.duckdnsName -and $s.duckdnsToken) { "$($settings.duckdnsName).duckdns.org" }
+    if ($ip -ne $s.publicIp -and $duck) { Write-Host "  $ip (changed since install; $duck follows it automatically)" -ForegroundColor Green }
+    elseif ($ip -ne $s.publicIp) { Write-Host "  CHANGED: now $ip (phone settings use $($s.publicIp)) - update IRL Pro and your DNS records, or use DuckDNS (docs\DOMAIN.md)" -ForegroundColor Yellow }
     else { Write-Host "  $ip (unchanged)" -ForegroundColor Green }
 } catch { Write-Host '  could not check (no internet?)' -ForegroundColor Red }
 

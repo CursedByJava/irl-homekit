@@ -26,6 +26,11 @@ param(
     [string] $BrbBackground = '',
     [string] $KickChannel = '',
     [string] $YoutubeChannelId = '',
+    # Dashboard username on first install (default: your Twitch channel). The password is asked for, never passed.
+    [string] $DashboardUser = '',
+    # Free DuckDNS name to keep pointed at this PC's home IP (see docs/DOMAIN.md). Taken from -Domain when it's a duckdns.org name.
+    [string] $DuckDnsName = '',
+    [string] $DuckDnsToken = '',
     # For testing into a sandbox: skip firewall, power, scheduled task, shortcuts, plugin install and starting things.
     [switch] $SkipSystem,
     [switch] $NonInteractive
@@ -100,7 +105,30 @@ if ($BaseCollection -and -not $OverlaySources) {
 }
 if (-not $KickChannel) { $KickChannel = Ask 'Your Kick channel name (Enter = same as Twitch, or none)' $TwitchChannel }
 if (-not $YoutubeChannelId) { $YoutubeChannelId = Ask 'Your YouTube channel ID, starts with UC (Enter = skip)' }
-if (-not $Domain) { $Domain = Ask 'Domain/subdomain for the remote dashboard, e.g. irl.example.com (Enter = local only)' }
+if (-not $Domain) {
+    Info 'No domain yet? Get a free one at duckdns.org or a cheap one for about $10/year: see docs\DOMAIN.md'
+    $Domain = Ask 'Domain for the remote dashboard, e.g. irl.example.com or yourname.duckdns.org (Enter = local only)'
+}
+$Domain = $Domain.Trim().ToLower()
+$oldSecrets = if (Test-Path "$InstallDir\secrets.json") { Get-Content "$InstallDir\secrets.json" -Raw | ConvertFrom-Json }
+if (-not $DuckDnsName -and $Domain -match '([a-z0-9-]+)\.duckdns\.org$') { $DuckDnsName = $Matches[1] }
+$DuckDnsName = ($DuckDnsName -replace '\.duckdns\.org$', '').ToLower()
+if ($DuckDnsName -and -not $DuckDnsToken -and -not $oldSecrets.duckdnsToken) {
+    $DuckDnsToken = Ask 'DuckDNS token (shown at the top of duckdns.org) so your name follows your home IP (Enter = skip)'
+}
+# Studio sits next to the dashboard: irl.example.com -> studio.example.com. A bare DuckDNS name has no siblings
+# you control, so yourname.duckdns.org -> studio.yourname.duckdns.org (DuckDNS answers for every name under yours).
+$studioDomain = if (-not $Domain) { '' } elseif ($Domain -match '^[a-z0-9-]+\.duckdns\.org$') { "studio.$Domain" } else { 'studio.' + ($Domain -replace '^[^.]+\.', '') }
+# Dashboard login: asked on the first install only. Change it later with the "IRL Homekit - Change login" shortcut.
+$login = $null
+if (-not $oldSecrets.dashboardUser) {
+    $defaultUser = $(if ($DashboardUser) { $DashboardUser } elseif ($TwitchChannel) { $TwitchChannel.ToLower() } else { 'admin' })
+    if ($NonInteractive) { $login = [pscustomobject]@{ Username = $defaultUser; Password = (New-Secret 16); Generated = $true } }
+    else {
+        Info 'Choose the login for your dashboard and Studio pages.'
+        $login = & "$repo\scripts\Set-DashboardLogin.ps1" -AskOnly -Username $defaultUser
+    }
+}
 
 # ------------------------------------------------------------------ 1. downloads
 Step 1 'Downloading tools (checksum-verified)'
@@ -135,11 +163,12 @@ if (-not $hadOverlayCfg) { Write-Utf8 "$InstallDir\overlays\config.js" ([IO.File
 
 $secretsFile = "$InstallDir\secrets.json"
 $s = if (Test-Path $secretsFile) { Get-Content $secretsFile -Raw | ConvertFrom-Json } else { [pscustomobject]@{} }
-foreach ($k in @{ goirlPassphrase = 20; mediamtxPass = 16; obsWebsocketPassword = 24; dashboardPassword = 16 }.GetEnumerator()) {
+foreach ($k in @{ goirlPassphrase = 20; mediamtxPass = 16; obsWebsocketPassword = 24 }.GetEnumerator()) {
     if (-not $s.($k.Key)) { $s | Add-Member -Force $k.Key (New-Secret $k.Value) }
 }
 if (-not $s.mediamtxUser) { $s | Add-Member -Force mediamtxUser 'irl' }
-if (-not $s.dashboardUser) { $s | Add-Member -Force dashboardUser ($(if ($TwitchChannel) { $TwitchChannel.ToLower() } else { 'admin' })) }
+if ($login) { $s | Add-Member -Force dashboardUser $login.Username; $s | Add-Member -Force dashboardPassword $login.Password }
+if ($DuckDnsToken) { $s | Add-Member -Force duckdnsToken $DuckDnsToken.Trim() }
 $lan = (Get-NetIPConfiguration | Where-Object IPv4DefaultGateway | Select-Object -First 1).IPv4Address.IPAddress
 $public = try { (Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 10).Trim() } catch { '' }
 $s | Add-Member -Force lanIp $lan; $s | Add-Member -Force publicIp $public
@@ -154,7 +183,7 @@ $settings = [ordered]@{
     obsDir = $ObsDir; obsProfile = $ObsName; obsCollection = $ObsName; domain = $Domain; twitchChannel = $TwitchChannel.ToLower()
     phoneInputs = @('IRL Phone (Bonded)', 'IRL Phone (Backup)'); overlayInputs = @($OverlaySources); audioInputs = $audio
     autoScenes = @('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)')
-    studioDomain = $(if ($Domain) { 'studio.' + ($Domain -replace '^[^.]+\.', '') } else { '' }); baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
+    studioDomain = $studioDomain; duckdnsName = $DuckDnsName; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
 }
 Write-Utf8 "$InstallDir\settings.json" ($settings | ConvertTo-Json -Depth 5)
 
@@ -280,12 +309,19 @@ Info 'OBS WebSocket enabled on port 4455 (password in secrets.json)'
 
 # ------------------------------------------------------------------ 6. dashboard + Caddy
 Step 6 'Setting up the remote dashboard'
-$env:IRLHK_PW = $s.dashboardPassword
-& $node -e "const c=require('crypto');const s=c.randomBytes(16);const h=c.scryptSync(process.env.IRLHK_PW,s,64);require('fs').writeFileSync(process.argv[1],JSON.stringify({username:process.argv[2],passwordHash:s.toString('hex')+':'+h.toString('hex'),port:8090},null,2))" "$InstallDir\dashboard\config.json" $s.dashboardUser
-$env:IRLHK_PW = $null
+& "$InstallDir\scripts\Set-DashboardLogin.ps1" -InstallDir $InstallDir -Username $s.dashboardUser -Password $s.dashboardPassword -Quiet
+Info "dashboard login: user $($s.dashboardUser)"
 if ($Domain) {
-    Write-Utf8 "$InstallDir\caddy\Caddyfile" ([IO.File]::ReadAllText("$repo\templates\Caddyfile").Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', $Domain + ', studio.' + ($Domain -replace '^[^.]+\.', '')))
-    Info "HTTPS dashboard: https://$Domain and Studio: https://studio.$($Domain -replace '^[^.]+\.', '') (needs DNS A records for both -> $public and router ports 80/443)"
+    Write-Utf8 "$InstallDir\caddy\Caddyfile" ([IO.File]::ReadAllText("$repo\templates\Caddyfile").Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$Domain, $studioDomain"))
+    if ($DuckDnsName -and $s.duckdnsToken) {
+        # Point the DuckDNS name at this PC now, so the HTTPS certificate can be issued on first start.
+        $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$DuckDnsName&token=$($s.duckdnsToken)" -TimeoutSec 15 } catch { "error: $($_.Exception.Message)" }
+        if ($r -eq 'OK') { Info "DuckDNS: $DuckDnsName.duckdns.org now points at this PC (kept up to date every 5 minutes)" }
+        else { Write-Warning "DuckDNS update failed ($r). Check the token and name at duckdns.org, then re-run with -DuckDnsToken." }
+        Info "HTTPS dashboard: https://$Domain and Studio: https://$studioDomain (needs router ports 80/443)"
+    } else {
+        Info "HTTPS dashboard: https://$Domain and Studio: https://$studioDomain (needs DNS records for both -> $public and router ports 80/443, see docs\DOMAIN.md)"
+    }
 } else {
     Remove-Item "$InstallDir\caddy\Caddyfile" -ErrorAction SilentlyContinue
     Info 'Dashboard: http://localhost:8090 (local only; re-run with -Domain to put it online)'
@@ -330,7 +366,7 @@ if ($SkipSystem) {
     Info "scheduled task 'IRL Homekit' runs at sign-in"
 
     $desktop = [Environment]::GetFolderPath('Desktop'); $sh = New-Object -ComObject WScript.Shell
-    foreach ($n in @(@('Status', 'Status-IRLHomekit'), @('Pause', 'Pause-IRLHomekit'), @('Resume', 'Resume-IRLHomekit'), @('Twitch chat token', 'Set-TwitchBotToken'), @('Update scenes', 'Update-IRLScenes'))) {
+    foreach ($n in @(@('Status', 'Status-IRLHomekit'), @('Pause', 'Pause-IRLHomekit'), @('Resume', 'Resume-IRLHomekit'), @('Twitch chat token', 'Set-TwitchBotToken'), @('Update scenes', 'Update-IRLScenes'), @('Change login', 'Set-DashboardLogin'))) {
         $l = $sh.CreateShortcut("$desktop\IRL Homekit - $($n[0]).lnk"); $l.TargetPath = 'powershell.exe'
         $l.Arguments = "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$InstallDir\scripts\$($n[1]).ps1`""; $l.WorkingDirectory = "$InstallDir\scripts"; $l.Save()
     }
@@ -343,11 +379,20 @@ $guide = [IO.File]::ReadAllText("$repo\docs\PHONE-SETUP.md")
 $dash = if ($Domain) { "https://$Domain" } else { 'http://localhost:8090 (on this PC only)' }
 foreach ($kv in ([ordered]@{ '{{PUBLIC_IP}}' = $(if ($public) { $public } else { '<your public IP>' }); '{{LAN_IP}}' = $lan; '{{GOIRL_PASSPHRASE}}' = $s.goirlPassphrase
     '{{MEDIAMTX_USER}}' = $s.mediamtxUser; '{{MEDIAMTX_PASS}}' = $s.mediamtxPass; '{{DASHBOARD_URL}}' = $dash; '{{DASHBOARD_USER}}' = $s.dashboardUser
+    '{{STUDIO_URL}}' = $(if ($Domain) { "https://$studioDomain" } else { 'http://localhost:8090/studio (on this PC only)' })
+    '{{PHONE_HOST}}' = $(if ($DuckDnsName -and $s.duckdnsToken) { "$DuckDnsName.duckdns.org" } elseif ($public) { $public } else { '<your public IP>' })
     '{{DASHBOARD_PASS}}' = $s.dashboardPassword; '{{INSTALL_DIR}}' = $InstallDir }).GetEnumerator()) { $guide = $guide.Replace($kv.Key, $kv.Value) }
 Write-Utf8 "$InstallDir\PHONE-SETUP.md" $guide
 
 if (-not $SkipSystem) { Remove-Item "$InstallDir\PAUSE" -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskName 'IRL Homekit' }
 
 Write-Host "`nDone." -ForegroundColor Green
-Write-Host "Your phone settings, passwords and the remaining steps (router port forwarding, auto sign-in) are in:"
+Write-Host "`nSign in to your dashboard:" -ForegroundColor Cyan
+Write-Host "    Dashboard  $dash"
+if ($Domain) { Write-Host "    Studio     https://$studioDomain" }
+Write-Host "    Username   $($s.dashboardUser)"
+Write-Host "    Password   $(if ($login -and $login.Generated) { $s.dashboardPassword } elseif ($login) { '(the one you chose)' } else { '(unchanged)' })"
+Write-Host "    Change it any time with the desktop shortcut 'IRL Homekit - Change login'."
+Write-Host "`nYour phone settings, passwords and the remaining steps (router port forwarding, auto sign-in) are in:"
 Write-Host "    $InstallDir\PHONE-SETUP.md" -ForegroundColor Yellow
+Write-Host "`nEnjoying IRL Homekit? It's free; if you'd like to chip in: https://github.com/CursedByJava/irl-homekit#support-the-project" -ForegroundColor DarkGray

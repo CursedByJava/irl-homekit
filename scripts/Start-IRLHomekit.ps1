@@ -68,13 +68,25 @@ function Ensure-Obs {
     Start-Sleep -Seconds 15
 }
 
+# Free DuckDNS name (docs/DOMAIN.md): point it at this PC's current home IP. Logged only when the answer changes.
+$lastDuck = ''
+function Update-DuckDns {
+    $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$($settings.duckdnsName)&token=$($secrets.duckdnsToken)" -TimeoutSec 10 } catch { "error: $($_.Exception.Message)" }
+    if ($r -ne $script:lastDuck) { Log "DuckDNS update for $($settings.duckdnsName).duckdns.org: $r"; $script:lastDuck = $r }
+}
+
 Log 'watchdog started'
 $nextTokenCheck = Get-Date
+$nextDuck = Get-Date
 while ($true) {
   try {
     if ((Get-Date) -ge $nextTokenCheck) {
         $nextTokenCheck = (Get-Date).AddHours(1)
         Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$root\scripts\Refresh-TwitchToken.ps1`""
+    }
+    if ($settings.duckdnsName -and $secrets.duckdnsToken -and (Get-Date) -ge $nextDuck) {
+        $nextDuck = (Get-Date).AddMinutes(5)
+        Update-DuckDns
     }
     if (-not (Test-Path $pauseFlag)) {
         Ensure-Obs

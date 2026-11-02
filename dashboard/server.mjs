@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(DIR, '..');
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^﻿/, ''));
-const cfg = readJson(path.join(DIR, 'config.json'));
+const CONFIG_FILE = path.join(DIR, 'config.json');
+let cfg = readJson(CONFIG_FILE);
 const secrets = readJson(`${ROOT}/secrets.json`);
 const settings = readJson(`${ROOT}/settings.json`);
 const PORT = cfg.port || 8090;
@@ -385,6 +386,16 @@ function authed(req) {
 function clientIp(req) { return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress; }
 function saveSessions() { fs.writeFile(path.join(DIR, 'sessions.json'), JSON.stringify([...sessions]), () => {}); }
 try { for (const [t, e] of JSON.parse(fs.readFileSync(path.join(DIR, 'sessions.json'), 'utf8'))) if (e > Date.now()) sessions.set(t, e); } catch { }
+// Set-DashboardLogin.ps1 rewrites config.json; pick up the new login and sign every device out.
+fs.watchFile(CONFIG_FILE, { interval: 2000 }, () => {
+  let next; try { next = readJson(CONFIG_FILE); } catch { return; }
+  if (!next.username || !next.passwordHash) return;
+  if (next.username === cfg.username && next.passwordHash === cfg.passwordHash) return;
+  cfg = { ...cfg, username: next.username, passwordHash: next.passwordHash };
+  sessions.clear(); saveSessions(); fails.clear();
+  for (const c of clients) c.end(); // open pages notice and go back to the sign-in screen
+  log('login changed; all devices signed out');
+});
 
 // ---------------------------------------------------------------- actions
 const SERVICE_EXE = { 'go-irl': 'go-irl.exe', mediamtx: 'mediamtx.exe', noalbs: 'noalbs.exe', caddy: 'caddy.exe' };

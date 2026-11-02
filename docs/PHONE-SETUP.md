@@ -37,23 +37,23 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
 | Field | Value |
 |---|---|
 | Protocol | **SRTLA** |
-| Server | `srtla://{{PUBLIC_IP}}:5000` |
+| Server | `srtla://{{PHONE_HOST}}:5000` |
 | Passphrase | `{{GOIRL_PASSPHRASE}}` |
 | Stream ID | (empty) |
 | Latency | `2000` ms (3000–4000 in crowded areas) |
 | Bonding | **ON** — Mobile data + Wi-Fi (+ USB/hotspot) |
 
-No separate passphrase field in your app version? Use `srtla://{{PUBLIC_IP}}:5000?passphrase={{GOIRL_PASSPHRASE}}`.
+No separate passphrase field in your app version? Use `srtla://{{PHONE_HOST}}:5000?passphrase={{GOIRL_PASSPHRASE}}`.
 
 ### Connection 2 — Backup (plain SRT, no bonding)
 | Field | Value |
 |---|---|
 | Protocol | **SRT** |
-| Server | `srt://{{PUBLIC_IP}}:8890` |
+| Server | `srt://{{PHONE_HOST}}:8890` |
 | Stream ID | `publish:live:{{MEDIAMTX_USER}}:{{MEDIAMTX_PASS}}` |
 | Latency | `2000` ms |
 
-Last resort RTMP: `rtmp://{{PUBLIC_IP}}:1935/live?user={{MEDIAMTX_USER}}&pass={{MEDIAMTX_PASS}}`
+Last resort RTMP: `rtmp://{{PHONE_HOST}}:1935/live?user={{MEDIAMTX_USER}}&pass={{MEDIAMTX_PASS}}`
 
 ### Video / audio
 - **1920×1080, 60 fps** (drop to 30 if the phone gets hot or signal is weak — OBS still outputs 60)
@@ -71,12 +71,24 @@ Signal rules: under **1000 kbps** → *IRL LOW* (banner), under **300 kbps** or 
 
 ## 4. Remote dashboard
 
-- URL: **{{DASHBOARD_URL}}** · user `{{DASHBOARD_USER}}` · password `{{DASHBOARD_PASS}}`
-- Phone signal per bonded link, live preview, uptime/bitrate/dropped frames, start/stop, scenes, mute,
-  reload feed/overlays, restart services. Add it to your home screen for an app icon.
+| | |
+|---|---|
+| Dashboard | **{{DASHBOARD_URL}}** |
+| Studio | **{{STUDIO_URL}}** |
+| Username | `{{DASHBOARD_USER}}` |
+| Password | `{{DASHBOARD_PASS}}` |
+
+- One login for both pages. You stay signed in for 30 days on each device; after 5 wrong passwords sign-in
+  locks for 15 minutes.
+- **Change your username or password:** double-click the desktop shortcut **IRL Homekit - Change login**. It
+  signs out every device and updates this file.
+- Tip: open the dashboard on your phone and *Add to Home Screen* for an app icon. Let your phone's password
+  manager save the login.
+- Dashboard: phone signal per bonded link, live preview, uptime/bitrate/dropped frames, start/stop, scenes, mute,
+  reload feed/overlays, restart services. Studio: combined chat, viewers, title and category on every platform.
 
 ## 5. Everyday
 
 Desktop shortcuts: **Status** (what's running, is the phone connected), **Pause** (free OBS for desktop streams),
-**Resume**. Logs: `{{INSTALL_DIR}}\logs`. Your public IP today: `{{PUBLIC_IP}}` — if it changes, update IRL Pro
-and your DNS record (Status warns you).
+**Resume**, **Update scenes**, **Change login**. Logs: `{{INSTALL_DIR}}\logs`. Your public IP today: `{{PUBLIC_IP}}`. If it changes, the Status shortcut tells you what to update (nothing, if you use
+a DuckDNS name with its token, see docs/DOMAIN.md in the repo).
