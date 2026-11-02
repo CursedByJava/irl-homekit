@@ -1,0 +1,26 @@
+{
+  "targets": [
+    {
+      "id": "1001",
+      "name": "Kick",
+      "protocol": "RTMP",
+      "service-param": { "server": "", "key": "", "use_auth": false },
+      "output-param": {},
+      "sync-start": true,
+      "sync-stop": true,
+      "enabled": false
+    },
+    {
+      "id": "1002",
+      "name": "YouTube",
+      "protocol": "RTMP",
+      "service-param": { "server": "rtmp://a.rtmp.youtube.com/live2", "key": "", "use_auth": false },
+      "output-param": {},
+      "sync-start": true,
+      "sync-stop": true,
+      "enabled": false
+    }
+  ],
+  "video_configs": [],
+  "audio_configs": []
+}

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Studio · IRL Homekit</title>
+  <link rel="icon" href="/icon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="/icon.svg" alt="">Studio</div>
+    <span class="pill" id="viewersPill"><span class="dot"></span><span id="viewersText">Loading…</span></span>
+    <a class="iconbtn" href="/logout" title="Sign out">Sign out</a>
+  </header>
+
+  <div class="banner error" id="linkBanner" role="alert"></div>
+
+  <main class="studio">
+    <!-- Platforms -->
+    <section class="card" aria-labelledby="platTitle">
+      <h2 id="platTitle">Your channels</h2>
+      <p class="sub">Live status and viewers on each platform, updated every 20–60 seconds.</p>
+      <div class="list" id="platforms"></div>
+    </section>
+
+    <!-- Stream info -->
+    <section class="card" aria-labelledby="infoTitle">
+      <h2 id="infoTitle">Stream info</h2>
+      <p class="sub">Changes go out right away, even while you're live.</p>
+      <label class="field-label" for="titleInput">Title</label>
+      <textarea id="titleInput" rows="2" maxlength="140" placeholder="What are you doing today?"></textarea>
+      <div class="row between field-foot"><span class="desc" id="titleCount">0 / 140</span>
+        <button class="btn small go" id="titleSave" disabled>Update title</button></div>
+
+      <label class="field-label" for="catInput">Category</label>
+      <div class="desc" id="catCurrent">Current: –</div>
+      <input id="catInput" type="search" placeholder="Search, e.g. Just Chatting, IRL, Travel" autocomplete="off">
+      <div class="cat-results" id="catResults"></div>
+      <p class="desc note" id="infoNote">Updates every connected platform.</p>
+    </section>
+
+    <!-- Chat -->
+    <section class="card chat-card span-2" aria-labelledby="chatTitle">
+      <div class="row between">
+        <h2 id="chatTitle">Chat</h2>
+        <div class="chat-filters" role="group" aria-label="Show chat from">
+          <button class="tag on" data-filter="all">All</button>
+          <button class="tag" data-filter="twitch">Twitch</button>
+          <button class="tag" data-filter="kick">Kick</button>
+          <button class="tag" data-filter="youtube">YouTube</button>
+        </div>
+      </div>
+      <div class="chat" id="chat" aria-live="polite"><div class="empty-note" id="chatEmpty">Waiting for messages… Twitch chat is connected; new messages show up here.</div></div>
+      <button class="btn small ghost jump" id="jumpBtn" hidden>New messages ↓</button>
+      <form class="chat-send" id="chatForm">
+        <select id="chatTarget" aria-label="Send to">
+          <option value="twitch">Twitch</option>
+        </select>
+        <input id="chatInput" maxlength="500" placeholder="Send a message" autocomplete="off">
+        <button class="btn small go" type="submit">Send</button>
+      </form>
+    </section>
+
+    <!-- Shortcuts -->
+    <section class="card" aria-labelledby="linksTitle">
+      <h2 id="linksTitle">Settings on each platform</h2>
+      <p class="sub">Things the platforms only let you change on their own sites. Opens in a new tab.</p>
+      <div class="list" id="links"></div>
+    </section>
+
+    <section class="card" aria-labelledby="moreTitle">
+      <h2 id="moreTitle">Good to know</h2>
+      <p class="sub">How the connections work.</p>
+      <div class="list">
+        <div class="item"><div class="grow"><div class="title">Kick &amp; YouTube connections</div>
+          <div class="desc">Use your own Kick developer app and Google Cloud project (see docs/PLATFORMS.md in the IRL Homekit repo). Disconnect any time from each site's connected-apps settings.</div></div></div>
+        <div class="item"><div class="grow"><div class="title">YouTube chat limits</div>
+          <div class="desc">Google allows a set number of requests per day, so YouTube chat refreshes about every 12 seconds while you're live, enough for 6+ hours a day.</div></div></div>
+        <div class="item"><div class="grow"><div class="title">Phone &amp; OBS controls</div>
+          <div class="desc">Signal, preview, scenes, start/stop live on your IRL dashboard.</div></div>
+          <a class="btn small ghost" id="irlLink" href="/">Open</a></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/studio.js"></script>
+</body>
+</html>

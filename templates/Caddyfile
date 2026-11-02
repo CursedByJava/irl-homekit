@@ -1,0 +1,23 @@
+{
+	# Certificates and Caddy state live next to the binary so everything stays in the install folder.
+	storage file_system {{INSTALL_DIR}}/caddy/data
+	admin 127.0.0.1:2019
+	log {
+		output file {{INSTALL_DIR}}/logs/caddy.log {
+			roll_size 10MiB
+			roll_keep 3
+		}
+	}
+}
+
+{{DOMAIN}} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8090 {
+		# Live stats use Server-Sent Events, which must not be buffered.
+		flush_interval -1
+	}
+}

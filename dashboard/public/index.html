@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <meta name="robots" content="noindex, nofollow">
+  <title>IRL Homekit</title>
+  <link rel="icon" href="/icon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="/icon.svg" alt="">IRL Homekit</div>
+    <span class="pill" id="livePill"><span class="dot"></span><span id="liveText">Connecting…</span></span>
+    <a class="iconbtn" href="/logout" title="Sign out">Sign out</a>
+  </header>
+
+  <div class="banner error" id="linkBanner" role="alert"></div>
+  <div class="banner warn" id="healthBanner" role="status"></div>
+
+  <main>
+    <!-- Phone signal -->
+    <section class="card" aria-labelledby="sigTitle">
+      <h2 id="sigTitle">Phone signal</h2>
+      <p class="sub" id="sigSource">Waiting for data from your home PC…</p>
+      <div class="signal-head">
+        <span class="big num" id="sigKbps">–</span><span class="unit">kbps</span>
+        <span class="quality q-idle" id="sigQuality">No data</span>
+      </div>
+      <div class="meter" aria-hidden="true"><span id="sigMeter"></span></div>
+      <p class="signal-desc" id="sigDesc">&nbsp;</p>
+      <div class="metrics">
+        <div class="metric"><div class="k">Latency</div><div class="v num" id="sigRtt">–</div><div class="hint">round trip</div></div>
+        <div class="metric"><div class="k">Packet loss</div><div class="v num" id="sigLoss">–</div><div class="hint">right now</div></div>
+        <div class="metric"><div class="k">Links</div><div class="v num" id="sigLinks">–</div><div class="hint">bonded paths</div></div>
+      </div>
+      <div class="links" id="links"></div>
+      <div class="source-tabs">
+        <span class="tag" id="tagBonded">Bonded · SRTLA</span>
+        <span class="tag" id="tagBackup">Backup · SRT/RTMP</span>
+      </div>
+    </section>
+
+    <!-- Stream -->
+    <section class="card" aria-labelledby="streamTitle">
+      <div class="row between">
+        <h2 id="streamTitle">Stream</h2>
+        <span class="tag" id="outputsTag">Twitch · Kick · YouTube</span>
+      </div>
+      <div class="preview" id="preview">
+        <img id="previewImg" alt="What viewers see right now">
+        <div class="empty" id="previewEmpty">Preview appears here once OBS is running.</div>
+        <div class="overlay" id="previewScene">–</div>
+      </div>
+      <div class="stream-stats">
+        <div class="metric"><div class="k">Uptime</div><div class="v num" id="upTime">–</div></div>
+        <div class="metric"><div class="k">Sending</div><div class="v num" id="outKbps">–</div></div>
+        <div class="metric"><div class="k">Dropped</div><div class="v num" id="dropped">–</div></div>
+      </div>
+      <div class="list" id="outputs"></div>
+      <div class="stream-actions">
+        <button class="btn go block" id="streamBtn" disabled>Start stream</button>
+      </div>
+      <div class="fps-row">
+        <div>
+          <div class="title">Frame rate</div>
+          <div class="desc" id="fpsDesc">What viewers get on Twitch, Kick and YouTube.</div>
+        </div>
+        <div class="segmented" role="group" aria-label="Stream frame rate">
+          <button id="fps60" data-fps="60">60 fps</button>
+          <button id="fps30" data-fps="30">30 fps</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scenes -->
+    <section class="card span-2" aria-labelledby="sceneTitle">
+      <h2 id="sceneTitle">Scenes</h2>
+      <p class="sub">Tap to put a scene on stream. <b>Auto</b> scenes are picked for you based on your phone signal. Pick any other scene (like Starting Soon) and auto-switching stays out of the way until you go back to an Auto scene.</p>
+      <div class="scenes" id="scenes"><div class="empty-note">Scenes load once OBS is connected.</div></div>
+      <div class="item update-scenes" id="updateScenesRow" hidden>
+        <div class="grow"><div class="title">Changed your overlays?</div>
+          <div class="desc" id="updateScenesDesc">Rebuilds the IRL scenes from your main OBS scene collection. Only while offline.</div></div>
+        <button class="btn small ghost" id="updateScenesBtn">Update scenes</button>
+      </div>
+    </section>
+
+    <!-- Audio -->
+    <section class="card" aria-labelledby="audioTitle">
+      <h2 id="audioTitle">Audio</h2>
+      <p class="sub">Your phone mic comes through the phone feed. Mute it here without touching the phone.</p>
+      <div class="list" id="audio"><div class="empty-note">Audio controls load once OBS is connected.</div></div>
+    </section>
+
+    <!-- Quick fixes -->
+    <section class="card" aria-labelledby="fixTitle">
+      <h2 id="fixTitle">Quick fixes</h2>
+      <p class="sub">Use these if something looks stuck on stream.</p>
+      <div class="list">
+        <div class="item"><div class="grow"><div class="title">Video frozen?</div><div class="desc">Reloads the phone feed in OBS. Viewers see a 1–2 second blip.</div></div>
+          <button class="btn small ghost" data-action="restartPhoneFeed">Reload feed</button></div>
+        <div class="item"><div class="grow"><div class="title">Chat or alerts not showing?</div><div class="desc">Reloads the chat overlay and alerts on stream.</div></div>
+          <button class="btn small ghost" data-action="refreshOverlays">Reload overlays</button></div>
+        <div class="item"><div class="grow"><div class="title">Recording</div><div class="desc" id="recDesc">Saves a local copy on the home PC.</div></div>
+          <button class="btn small ghost" id="recBtn">Start recording</button></div>
+      </div>
+    </section>
+
+    <!-- Home PC health -->
+    <section class="card" aria-labelledby="healthTitle">
+      <h2 id="healthTitle">Home PC</h2>
+      <p class="sub" id="pcSummary">Checking…</p>
+      <div class="list" id="services"></div>
+    </section>
+
+    <!-- Auto-switch history -->
+    <section class="card" aria-labelledby="histTitle">
+      <h2 id="histTitle">Auto-switch history</h2>
+      <p class="sub">Most recent first. Times are in your phone's time zone.</p>
+      <div class="timeline" id="history"><div class="empty-note">No automatic scene changes yet.</div></div>
+    </section>
+  </main>
+
+  <dialog id="confirm">
+    <h3 id="confirmTitle"></h3>
+    <p id="confirmText"></p>
+    <div class="actions">
+      <button class="btn ghost" id="confirmNo" value="no">Cancel</button>
+      <button class="btn stop" id="confirmYes" value="yes">Confirm</button>
+    </div>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

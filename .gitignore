@@ -1,0 +1,11 @@
+# Never commit generated configs or secrets
+secrets.json
+settings.json
+*.env
+.env
+dashboard/config.json
+dashboard/sessions.json
+logs/
+_downloads/
+caddy/data/
+PHONE-SETUP.local.md

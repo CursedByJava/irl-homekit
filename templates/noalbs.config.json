@@ -1,0 +1,47 @@
+{
+  "user": { "id": null, "name": "{{TWITCH_CHANNEL}}", "passwordHash": null },
+  "switcher": {
+    "bitrateSwitcherEnabled": true,
+    "onlySwitchWhenStreaming": false,
+    "instantlySwitchOnRecover": true,
+    "autoSwitchNotification": true,
+    "retryAttempts": 5,
+    "triggers": { "low": 1000, "rtt": 2500, "offline": 300, "rttOffline": 4000 },
+    "switchingScenes": { "normal": "IRL LIVE", "low": "IRL LOW", "offline": "IRL BRB" },
+    "streamServers": [
+      {
+        "streamServer": { "type": "GoIrl", "url": "ws://127.0.0.1:8888/ws" },
+        "name": "Bonded (go-irl SRTLA)",
+        "priority": 0,
+        "overrideScenes": null,
+        "dependsOn": null,
+        "enabled": true
+      },
+      {
+        "streamServer": { "type": "Mediamtx", "statsUrl": "http://127.0.0.1:9997/v3/paths/get/live" },
+        "name": "Backup (MediaMTX SRT-RTMP)",
+        "priority": 1,
+        "overrideScenes": { "normal": "IRL LIVE (Backup)", "low": "IRL LOW (Backup)", "offline": "IRL BRB" },
+        "dependsOn": null,
+        "enabled": true
+      }
+    ]
+  },
+  "software": {
+    "type": "Obs",
+    "host": "127.0.0.1",
+    "password": "{{OBS_WS_PASSWORD}}",
+    "port": 4455
+  },
+  "chat": null,
+  "optionalScenes": { "starting": "{{STARTING_SCENE}}", "ending": "{{ENDING_SCENE}}", "privacy": null, "refresh": null },
+  "optionalOptions": {
+    "twitchTranscodingCheck": false,
+    "twitchTranscodingRetries": 5,
+    "twitchTranscodingDelaySeconds": 15,
+    "offlineTimeout": 20,
+    "recordWhileStreaming": false,
+    "switchToStartingSceneOnStreamStart": false,
+    "switchFromStartingSceneToLiveScene": false
+  }
+}

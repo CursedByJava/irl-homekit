@@ -1,0 +1,17 @@
+{
+  "platform": "Twitch",
+  "username": "{{TWITCH_CHANNEL}}",
+  "admins": ["{{TWITCH_CHANNEL}}"],
+  "ignoreUsers": [],
+  "language": "EN",
+  "prefix": "!",
+  "enablePublicCommands": true,
+  "enableModCommands": true,
+  "enableAutoStopStreamOnHostOrRaid": true,
+  "announceRaidOnAutoStop": true,
+  "commands": {
+    "Fix": { "permission": "Mod", "userPermissions": null, "alias": ["f"] },
+    "Switch": { "permission": "Mod", "userPermissions": null, "alias": ["ss"] },
+    "Bitrate": { "permission": null, "userPermissions": null, "alias": ["b"] }
+  }
+}
