@@ -11,6 +11,12 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.4] - 2026-11-02
+
+### Changed
+- The low-bitrate warning is now one small line in the bottom-left corner (signal bars, `Low bitrate`, live kbps),
+  so it no longer covers the top of the stream.
+
 ## [1.0.0-beta.3] - 2026-11-01
 
 ### Fixed
@@ -100,7 +106,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.3...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.4...HEAD
+[1.0.0-beta.4]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.3...v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.1...v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/CursedByJava/irl-homekit/compare/146fa7c...v1.0.0-beta.1
