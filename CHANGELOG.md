@@ -17,6 +17,12 @@ is what the built-in update checker reads.
 - After an OBS crash, IRL Homekit could fail to open or close properly: a crashed OBS can stay listed by Windows
   after it has exited (until the PC restarts), and IRL Homekit mistook it for the running one. Clicking the icon then
   showed nothing, and closing OBS made it restart in the tray. It now ignores processes that have already exited.
+- **Opening IRL Homekit while it's running now shows its window** (Windows used to ignore the second click), also
+  when it's in the tray.
+- **Closing it always quits.** It no longer restarts hidden in the tray; only a start at sign-in begins in the tray.
+
+### Added
+- Your logo on the tray icon too, kept there when OBS changes it (e.g. when you go live).
 
 ## [1.0.0-beta.8] - 2026-11-02
 

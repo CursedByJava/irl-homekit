@@ -32,7 +32,7 @@ if ($OnlyAutoStart) { if ($AutoStart) { Set-AutoStart ($AutoStart -eq 'On') }; r
 # ---- the two tasks
 $user = "$env:USERDOMAIN\$env:USERNAME"
 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
-$set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+$set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances Parallel   # a second launch brings the running app's window forward
 $run = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$app`""
 $wasOn = (Get-ScheduledTask -TaskName $signinTask -ErrorAction SilentlyContinue).State -notin $null, 'Disabled'
 Register-ScheduledTask -TaskName $appTask -Description 'Opens IRL Homekit as administrator (Start menu / desktop shortcut).' `

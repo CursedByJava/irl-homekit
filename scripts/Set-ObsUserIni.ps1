@@ -34,6 +34,8 @@ $dir = $ObsName -replace '[^A-Za-z0-9_\-]', '_'
 Set-Ini 'General' 'FirstRun' 'true'
 Set-Ini 'General' 'WarnedAboutClosingDocks' 'true'
 Set-Ini 'BasicWindow' 'SysTrayEnabled' 'true'
+# Closing the window quits (and with it IRL Homekit); it never hides in the tray.
+Set-Ini 'BasicWindow' 'SysTrayMinimizeToTray' 'false'
 # The IRL Homekit skin (templates/IRL_Homekit.ovt), so this OBS never looks like your regular one.
 Set-Ini 'Appearance' 'Theme' 'com.irlhomekit.Yami.IRLHomekit'
 Set-Ini 'Basic' 'Profile' $ObsName

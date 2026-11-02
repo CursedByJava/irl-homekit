@@ -26,6 +26,13 @@ public delegate bool EnumProc(IntPtr h, IntPtr l);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool SetWindowText(IntPtr h, string s);
 [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr LoadImage(IntPtr inst, string name, int type, int cx, int cy, int flags);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public struct NOTIFYICONDATA {
+    public int cbSize; public IntPtr hWnd; public int uID; public int uFlags; public int uCallbackMessage; public IntPtr hIcon;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string szTip; public int dwState; public int dwStateMask;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string szInfo; public int uVersion;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string szInfoTitle; public int dwInfoFlags; public Guid guidItem; public IntPtr hBalloonIcon; }
+[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern bool Shell_NotifyIcon(int msg, ref NOTIFYICONDATA d);
 '@
 
 # Only IRL Homekit's own OBS counts; your normal OBS can run at the same time.
@@ -52,7 +59,8 @@ function Get-IrlObsWindow {
 
 function Show-IrlObs {
     $h = Get-IrlObsWindow
-    if ($h -ne [IntPtr]::Zero) { [void][IRLHK.Win]::ShowWindow($h, 9); [void][IRLHK.Win]::SetForegroundWindow($h) }
+    # SW_SHOW brings it back from the tray, SW_RESTORE un-minimizes it.
+    if ($h -ne [IntPtr]::Zero) { [void][IRLHK.Win]::ShowWindow($h, 5); [void][IRLHK.Win]::ShowWindow($h, 9); [void][IRLHK.Win]::SetForegroundWindow($h) }
 }
 
 # Our logo on the window (title bar, taskbar, Alt+Tab) and "IRL Homekit" as its name, so it's never mistaken for
@@ -72,6 +80,23 @@ function Set-IrlBranding {
         [void][IRLHK.Win]::SendMessage($h, 0x80, [IntPtr]1, $big)     # WM_SETICON, ICON_BIG
         [void][IRLHK.Win]::SendMessage($h, 0x80, [IntPtr]0, $small)   # WM_SETICON, ICON_SMALL
         $script:brandedFor = $h
+        $script:trayIcon = $small
+    }
+    # The tray icon too. It belongs to OBS's hidden tray window (Qt, icon id 0); OBS swaps it when you go live or
+    # record, so it's set again every few seconds.
+    $p = Get-IrlObs | Select-Object -First 1
+    if ($p -and $script:trayIcon) {
+        $script:trayWnd = [IntPtr]::Zero
+        [IRLHK.Win]::EnumWindows({ param($w, $l)
+            $wpid = 0; [void][IRLHK.Win]::GetWindowThreadProcessId($w, [ref]$wpid)
+            if ($wpid -eq $p.Id) { $c = New-Object System.Text.StringBuilder 128; [void][IRLHK.Win]::GetClassName($w, $c, 128); if ($c.ToString() -like '*TrayIconMessageWindowClass') { $script:trayWnd = $w } }
+            $true }, [IntPtr]::Zero) | Out-Null
+        if ($script:trayWnd -ne [IntPtr]::Zero) {
+            $d = New-Object IRLHK.Win+NOTIFYICONDATA
+            $d.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($d); $d.hWnd = $script:trayWnd; $d.uID = 0
+            $d.uFlags = 0x2 -bor 0x4; $d.hIcon = $script:trayIcon; $d.szTip = 'IRL Homekit'   # NIF_ICON | NIF_TIP
+            [void][IRLHK.Win]::Shell_NotifyIcon(1, [ref]$d)                                   # NIM_MODIFY
+        }
     }
 }
 
@@ -187,7 +212,7 @@ while ($true) {
   try {
     $irlObs = Get-IrlObs | Select-Object -First 1
     if (-not $irlObs) {
-        if (Test-ObsCrashed) { Log 'IRL Homekit OBS crashed; restarting it'; Start-IrlObs -Minimized }
+        if (Test-ObsCrashed) { Log 'IRL Homekit OBS crashed; restarting it'; Start-IrlObs -Minimized:$Background }
         else { Stop-Everything; break }
     } elseif (-not (Get-NetTCPConnection -LocalPort $wsPort -State Listen -ErrorAction SilentlyContinue)) {
         # Running but not answering: OBS crashed and is sitting on its crash window. Restart it after 45 seconds.
@@ -195,7 +220,7 @@ while ($true) {
         elseif ((Get-Date) - $noWsSince -gt [TimeSpan]::FromSeconds(45) -and (Get-Date) - $irlObs.StartTime -gt [TimeSpan]::FromSeconds(60)) {
             Log 'IRL Homekit OBS stopped responding (crashed with its window open); restarting it'
             $irlObs | Stop-Process -Force -ErrorAction SilentlyContinue; $noWsSince = $null
-            Start-Sleep -Seconds 2; Start-IrlObs -Minimized
+            Start-Sleep -Seconds 2; Start-IrlObs -Minimized:$Background
         }
     } else { $noWsSince = $null }
     Set-IrlBranding
