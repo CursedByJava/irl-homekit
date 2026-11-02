@@ -11,6 +11,13 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.9] - 2026-11-02
+
+### Fixed
+- After an OBS crash, IRL Homekit could fail to open or close properly: a crashed OBS can stay listed by Windows
+  after it has exited (until the PC restarts), and IRL Homekit mistook it for the running one. Clicking the icon then
+  showed nothing, and closing OBS made it restart in the tray. It now ignores processes that have already exited.
+
 ## [1.0.0-beta.8] - 2026-11-02
 
 ### Added
@@ -144,7 +151,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.8...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.9...HEAD
+[1.0.0-beta.9]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.7...v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.6...v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.5...v1.0.0-beta.6

@@ -29,7 +29,12 @@ public delegate bool EnumProc(IntPtr h, IntPtr l);
 '@
 
 # Only IRL Homekit's own OBS counts; your normal OBS can run at the same time.
-function Get-IrlObs { Get-Process -Name obs64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $obsExe } }
+# A crashed OBS can stay listed after it has exited (stuck closing until the PC restarts); that one doesn't count.
+function Get-IrlObs {
+    Get-Process -Name obs64 -ErrorAction SilentlyContinue | Where-Object {
+        $_.Path -eq $obsExe -and -not $(try { $_.HasExited } catch { $false })
+    } | Sort-Object StartTime -Descending
+}
 
 # The main OBS window (not a dock or helper window), even while it's hidden in the tray.
 function Get-IrlObsWindow {
