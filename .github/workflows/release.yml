@@ -1,29 +1,42 @@
-# Publishes a GitHub release when a version tag is pushed (e.g. v1.0.0-beta.2), with that version's section of
-# CHANGELOG.md as the notes. Versions with a "-" (betas) are marked as pre-releases. The app's update checker reads
-# these releases.
+# Publishes the GitHub release for the version in VERSION, with that version's section of CHANGELOG.md as the
+# notes. Runs when VERSION (or this file) changes on main, when a v* tag is pushed, or by hand (Actions > Release >
+# Run workflow). Does nothing if that version's release already exists. Versions with a "-" (betas) are published
+# as pre-releases. The app's update checker reads these releases.
 name: Release
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    paths: ['VERSION', '.github/workflows/release.yml']
+  workflow_dispatch: {}
 permissions:
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Check VERSION matches the tag
+      - name: Read version
+        id: v
         run: |
-          test "v$(tr -d '[:space:]' < VERSION)" = "$GITHUB_REF_NAME" || { echo "VERSION says $(cat VERSION), tag is $GITHUB_REF_NAME"; exit 1; }
+          ver="$(tr -d '[:space:]' < VERSION)"
+          echo "ver=$ver" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$ver" ]; then
+            echo "VERSION says $ver but the tag is $GITHUB_REF_NAME"; exit 1
+          fi
+          if gh release view "v$ver" > /dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; fi
       - name: Release notes from CHANGELOG.md
+        if: steps.v.outputs.exists != 'true'
         run: |
-          ver="${GITHUB_REF_NAME#v}"
+          ver="${{ steps.v.outputs.ver }}"
           awk -v v="$ver" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > notes.md
           test -s notes.md || { echo "No '## [$ver]' section in CHANGELOG.md"; exit 1; }
           printf '\n---\n**Install:** download the source code zip below, extract it and double-click `Install IRL Homekit.cmd`.\n**Update:** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
       - name: Create release
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: steps.v.outputs.exists != 'true'
         run: |
-          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" --title "IRL Homekit ${GITHUB_REF_NAME#v}" --notes-file notes.md $pre
+          ver="${{ steps.v.outputs.ver }}"
+          pre=""; case "$ver" in *-*) pre="--prerelease" ;; esac
+          gh release create "v$ver" --target "$GITHUB_SHA" --title "IRL Homekit $ver" --notes-file notes.md $pre

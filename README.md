@@ -198,10 +198,10 @@ dashboard (*Home PC*) and in Settings → Apps.
 
 1. Put the version in `VERSION` (e.g. `1.0.0-beta.2`, or `1.0.0` for stable).
 2. In `CHANGELOG.md`, move the *Unreleased* notes under a new `## [1.0.0-beta.2] - YYYY-MM-DD` heading.
-3. Commit, then tag and push: `git tag v1.0.0-beta.2 && git push origin main v1.0.0-beta.2`.
+3. Commit and push to `main`.
 
-The *Release* workflow publishes the GitHub release with those notes (betas as pre-releases), and every
-installed copy offers the update.
+The *Release* workflow sees the new `VERSION`, creates the tag and publishes the GitHub release with those notes
+(betas as pre-releases), and every installed copy offers the update.
 </details>
 
 ## Troubleshooting
