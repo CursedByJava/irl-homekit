@@ -1,20 +1,22 @@
 # Uninstalls IRL Homekit: closes it, removes its shortcuts, start-at-sign-in, firewall rules and the Settings > Apps
 # entry, and optionally deletes the install folder (settings, passwords, the IRL Homekit OBS and downloaded tools).
 # Your normal OBS is not touched. Run from Settings > Apps > IRL Homekit > Uninstall, or the Start menu.
-param([string] $InstallDir = (Split-Path $PSScriptRoot -Parent), [switch] $DeleteFiles)
+param([string] $InstallDir = (Split-Path $PSScriptRoot -Parent), [switch] $DeleteFiles,
+    # No questions (for scripts): uninstall, and delete the install folder only with -DeleteFiles.
+    [switch] $Yes)
 $ErrorActionPreference = 'Stop'
 
 # Firewall rules need administrator rights: ask once, then continue elevated.
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InstallDir `"$InstallDir`""
+    Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InstallDir `"$InstallDir`"$(if ($Yes) { ' -Yes' })$(if ($DeleteFiles) { ' -DeleteFiles' })"
     exit
 }
 
 Write-Host "`nUninstall IRL Homekit" -ForegroundColor Cyan
 Write-Host "This removes IRL Homekit from this PC. Your normal OBS and its scenes are not touched."
-if ((Read-Host 'Continue? (y/N)') -notmatch '^y') { Write-Host 'Nothing was changed.'; return }
-$wipe = $DeleteFiles -or ((Read-Host "Also delete $InstallDir (settings, passwords, stream keys, the IRL Homekit OBS)? (y/N)") -match '^y')
+if (-not $Yes -and (Read-Host 'Continue? (y/N)') -notmatch '^y') { Write-Host 'Nothing was changed.'; return }
+$wipe = $DeleteFiles -or (-not $Yes -and (Read-Host "Also delete $InstallDir (settings, passwords, stream keys, the IRL Homekit OBS)? (y/N)") -match '^y')
 
 # 1. Close it: the app first (so it doesn't restart anything), then OBS and the services.
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -like '*Start-IRLHomekit.ps1*' } |
@@ -51,4 +53,4 @@ if ($wipe) {
     Write-Host "  kept $InstallDir (delete it yourself whenever you like)"
 }
 Write-Host "`nIRL Homekit is uninstalled. Remember to remove the port forwards on your router." -ForegroundColor Green
-Read-Host 'Press Enter to close'
+if (-not $Yes) { Read-Host 'Press Enter to close' }

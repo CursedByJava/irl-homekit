@@ -226,7 +226,7 @@ function dashboard() {
 
   let svcKey = '';
   function renderServices() {
-    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats) + JSON.stringify(s.remote);
+    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats) + JSON.stringify(s.remote) + JSON.stringify(s.blocked);
     if (key === svcKey) return; svcKey = key;
     const rm = s.remote;
     if (rm) {
@@ -243,7 +243,11 @@ function dashboard() {
     $('autoStartDesc').textContent = s.autoStart
       ? 'IRL Homekit opens by itself (minimized) when the PC signs in, so this page is always reachable.'
       : 'Off: after a restart, IRL Homekit (and this page) stays closed until someone opens it on the PC.';
-    $('pcSummary').textContent = down.length ? down.length + ' part' + (down.length > 1 ? 's are' : ' is') + ' not running. IRL Homekit restarts them within 10–30 seconds.'
+    const blocked = s.blocked || [];
+    $('pcSummary').textContent = blocked.length
+      ? 'Windows is blocking ' + blocked.join(', ') + ' (Smart App Control blocks open-source tools without a paid signature). '
+        + 'On the PC: Windows Security > App & browser control > Smart App Control settings > Off. IRL Homekit retries every minute.'
+      : down.length ? down.length + ' part' + (down.length > 1 ? 's are' : ' is') + ' not running. IRL Homekit restarts them within 10–30 seconds.'
       : 'Everything is running.' + (st.cpu != null ? ' OBS: ' + st.cpu + '% CPU, ' + st.fps + ' fps.' : '');
     const hb = $('healthBanner');
     if (st.renderSkipped > 0 && s.stream.active && st.fps && st.fps < 55) { hb.innerHTML = '<b>The home PC is struggling.</b> OBS is rendering at ' + st.fps + ' fps instead of 60. Close other programs on the PC.'; hb.classList.add('show'); }

@@ -11,6 +11,21 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] - 2026-11-01
+
+### Fixed
+- Installing on a PC without Node.js failed (Windows Installer error 1603, found by a clean-PC test). IRL Homekit
+  now keeps its own copy of Node.js in `C:\IRLHomekit\node` (the official portable zip, checksum-verified): no
+  installer, no system changes, and it works on PCs without winget.
+
+### Added
+- A clean-PC install test (Windows Sandbox: no Node.js, no winget) now passes: install, app start, uninstall.
+- Screenshots of the IRL Homekit OBS and the dashboard in the README.
+- `Uninstall-IRLHomekit.ps1 -Yes` uninstalls without questions (for scripts and tests).
+- GitHub Discussions for questions and sharing setups, linked from the README and the new-issue page.
+- Windows **Smart App Control** blocks are detected and explained: the installer test-runs each tool and says
+  which ones Windows blocks and how to allow them; the dashboard shows it too, and IRL Homekit retries every minute
+  instead of every few seconds.
 ## [1.0.0-beta.2] - 2026-11-01
 
 ### Added
@@ -85,7 +100,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.2...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.3...HEAD
+[1.0.0-beta.3]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.2...v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.1...v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/CursedByJava/irl-homekit/compare/146fa7c...v1.0.0-beta.1
 [0.4.0]: https://github.com/CursedByJava/irl-homekit/commit/146fa7c

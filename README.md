@@ -21,6 +21,15 @@ Home PC ── go-irl (bonded receiver) ──┐
         ── Dashboard + Caddy (HTTPS) ← you, on your phone  ── YouTube  (obs-multi-rtmp)
 ```
 
+<p align="center">
+  <img src="docs/images/irl-homekit-obs.png" alt="The IRL Homekit OBS: its own skin, logo and IRL scenes, showing the animated Be Right Back screen" width="100%">
+</p>
+<p align="center">
+  <img src="docs/images/dashboard-phone.png" alt="Dashboard on a phone: phone signal" width="260">
+  &nbsp;&nbsp;
+  <img src="docs/images/dashboard-phone-2.png" alt="Dashboard on a phone: start stream, frame rate and scenes" width="260">
+</p>
+<p align="center"><sub>The IRL Homekit OBS (top) and the remote dashboard on a phone (bottom).</sub></p>
 ## What you get
 
 | | IRL Toolkit-style feature | How |
@@ -42,12 +51,14 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Sup
 
 - Windows 10/11 PC with a decent GPU (NVIDIA/AMD encoder recommended). You **don't** need OBS installed:
   IRL Homekit brings its own copy. If you already use OBS, the installer can copy your scenes and settings from it.
+- Windows 11 *Smart App Control* must allow IRL Homekit's open-source tools. The installer checks this and tells you if it
+  doesn't ([details](docs/TROUBLESHOOTING.md#windows-blocks-the-tools-smart-app-control)).
 - A home connection with a **public IPv4** you can port-forward (most fiber/cable; not CGNAT, see [ROUTER.md](docs/ROUTER.md))
 - Optional, to reach the dashboard from your phone anywhere: a **free** name from [DuckDNS](https://www.duckdns.org) or a
   domain you own (about $10/year). A guided setup does the rest: see [Remote dashboard](#remote-dashboard).
 - Optional for the self-test: ffmpeg, `winget install Gyan.FFmpeg`
 
-Node.js (for the dashboard) is installed for you if it's missing.
+Nothing else to install: IRL Homekit brings its own copy of Node.js (for the dashboard) if your PC doesn't have it.
 
 ## Install
 
@@ -228,7 +239,8 @@ The *Release* workflow sees the new `VERSION`, creates the tag and publishes the
 
 ## Troubleshooting
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). Found a bug? [Report it](https://github.com/CursedByJava/irl-homekit/issues/new/choose).
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). Questions or want to share your setup? Ask in
+[Discussions](https://github.com/CursedByJava/irl-homekit/discussions). Found a bug? [Report it](https://github.com/CursedByJava/irl-homekit/issues/new/choose).
 Security problem? See [SECURITY.md](SECURITY.md).
 
 ## Support the project

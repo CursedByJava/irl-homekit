@@ -54,7 +54,8 @@ $s | Add-Member -Force dashboardPassword $Password
 [IO.File]::WriteAllText($secretsFile, ($s | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
 
 # 2. The dashboard only stores a scrypt hash. Keep the old hash when nothing changed, so re-installs don't sign you out.
-$node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
+$node = @("$InstallDir\node\node.exe", (Get-Command node.exe -ErrorAction SilentlyContinue).Source, "$env:ProgramFiles\nodejs\node.exe") |
+    Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $node) { throw 'Node.js not found. Install it with:  winget install OpenJS.NodeJS.LTS' }
 $env:IRLHK_PW = $Password
 try {

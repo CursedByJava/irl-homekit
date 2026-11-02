@@ -23,6 +23,23 @@ powershell -ExecutionPolicy Bypass -File C:\IRLHomekit\tools\Test-IRLHomekit.ps1
 Sends fake phone streams (backup, low bitrate, bonded SRTLA) into the PC and checks OBS switches scenes. It never
 starts your real stream.
 
+## Windows blocks the tools (Smart App Control)
+
+**Symptom:** the installer warns "Windows Smart App Control is blocking …", or the dashboard says "Windows is
+blocking go-irl, MediaMTX, NOALBS". The phone can't connect and scenes don't switch.
+
+**Why:** *Smart App Control* (Windows 11) only lets programs run that are signed by a known publisher or that
+Microsoft's cloud already trusts. go-irl, MediaMTX, NOALBS and Caddy are free, open-source tools without a paid
+code-signing certificate, so on some PCs Windows refuses to start them. On other PCs (with Smart App Control on) they
+run fine, because Windows decides per file.
+
+**Fix:** Windows Security → **App & browser control** → **Smart App Control settings** → **Off**. IRL Homekit notices
+within a minute and starts them by itself.
+
+> Good to know: Windows doesn't let you turn Smart App Control back on without resetting Windows. Microsoft Defender
+> antivirus keeps protecting the PC either way. If you'd rather keep it on, IRL Homekit can't run its phone receivers
+> on that PC.
+
 ## Doing a desktop stream
 Your regular OBS is separate from IRL Homekit's, so just use it. Close the IRL Homekit OBS window first so the two
 don't compete for your graphics card (and so IRL Homekit's auto-switcher isn't running). Open IRL Homekit again

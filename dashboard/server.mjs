@@ -164,6 +164,8 @@ function pollServices() {
     // OBS: your normal OBS may be open too, so "running" means IRL Homekit's own OBS answering on its WebSocket.
     state.services = { obs: obs.ready, mediamtx: names.has('mediamtx.exe'), 'go-irl': names.has('go-irl.exe'), noalbs: names.has('noalbs.exe') };
     if (settings.domain) state.services.caddy = names.has('caddy.exe');
+    // Programs Windows Smart App Control refused to start (written by the app, scripts/Start-IRLHomekit.ps1).
+    try { state.blocked = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'blocked.json'), 'utf8')); } catch { state.blocked = []; }
   });
 }
 

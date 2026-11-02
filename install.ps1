@@ -99,15 +99,25 @@ if ($prev) {
 $ObsDir = "$InstallDir\obs\bin\64bit"
 $ObsConfigDir = "$InstallDir\obs\config\obs-studio"
 $ObsWsPort = 4456   # not OBS's default 4455, so it never clashes with your normal OBS
-$node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
-if (-not $node -and -not $NonInteractive -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-    Info 'Node.js (needed for the dashboard) is not installed. Installing it with winget...'
-    winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements --silent | Out-Host
-    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
-    $node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
+# The dashboard needs Node.js 22+. Use the PC's own if it has one; otherwise IRL Homekit keeps a private copy in
+# $InstallDir\node: the official portable zip from nodejs.org (pinned, checksum-verified), no installer, no system changes.
+$node = @("$InstallDir\node\node.exe", (Get-Command node.exe -ErrorAction SilentlyContinue).Source, "$env:ProgramFiles\nodejs\node.exe") |
+    Where-Object { $_ -and (Test-Path $_) -and [int]((& $_ --version) -replace '^v(\d+).*', '$1') -ge 22 } | Select-Object -First 1
+if (-not $node) {
+    Info 'Getting Node.js 22 (for the dashboard) from nodejs.org...'
+    New-Item -ItemType Directory -Force "$InstallDir\_downloads" | Out-Null
+    $nodeZip = "$InstallDir\_downloads\node-v22.23.4-win-x64.zip"
+    if (-not (Test-Path $nodeZip) -or (Get-FileHash $nodeZip).Hash.ToLower() -ne 'cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20') {
+        Invoke-WebRequest 'https://nodejs.org/dist/v22.23.4/node-v22.23.4-win-x64.zip' -OutFile $nodeZip -UseBasicParsing
+    }
+    if ((Get-FileHash $nodeZip).Hash.ToLower() -ne 'cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20') { Remove-Item $nodeZip -Force; throw 'Node.js download: checksum mismatch, refused.' }
+    $tmp = "$InstallDir\_downloads\node-extract"; if (Test-Path $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+    Expand-Archive $nodeZip $tmp -Force
+    if (Test-Path "$InstallDir\node") { Remove-Item -LiteralPath "$InstallDir\node" -Recurse -Force }
+    Move-Item (Get-ChildItem $tmp -Directory | Select-Object -First 1).FullName "$InstallDir\node"
+    Remove-Item -LiteralPath $tmp -Recurse -Force
+    $node = "$InstallDir\node\node.exe"
 }
-if (-not $node) { throw 'Node.js not found (needed for the dashboard). Install it with:  winget install OpenJS.NodeJS.LTS  then run the installer again.' }
-if ([int]((& $node --version) -replace '^v(\d+).*', '$1') -lt 22) { throw 'Node.js 22 or newer is required. Update with:  winget upgrade OpenJS.NodeJS.LTS' }
 Info "Node: $node"
 # Older versions had an always-on task that relaunched IRL Homekit every 5 minutes; switch it off before anything
 # else, so it can't reopen things mid-update. (It's replaced by the on-demand tasks at the end.)
@@ -237,6 +247,23 @@ foreach ($d in $Downloads) {
     # NOALBS zips its files inside a versioned folder; flatten it.
     Get-ChildItem $dest -Directory -Filter 'noalbs-v*' | ForEach-Object { Get-ChildItem $_.FullName -Force | Move-Item -Destination $dest -Force; Remove-Item $_.FullName -Force }
     Info "$($d.Name): ok"
+}
+# Windows Smart App Control can block programs that don't carry a paid publisher signature, like these open-source
+# tools. Run each one once so a block is explained now, not discovered later as "not running".
+$blocked = @()
+foreach ($t in @(@('go-irl', "$InstallDir\go-irl\go-irl.exe", '-h'), @('MediaMTX', "$InstallDir\mediamtx\mediamtx.exe", '--help'),
+                 @('NOALBS', "$InstallDir\noalbs\noalbs.exe", '--help'), @('Caddy', "$InstallDir\caddy\caddy.exe", 'version'))) {
+    try {
+        $p = Start-Process $t[1] -ArgumentList $t[2] -WindowStyle Hidden -PassThru -ErrorAction Stop
+        if (-not $p.WaitForExit(3000)) { $p.Kill() }
+    } catch { if ("$_" -match 'Application Control|blocked') { $blocked += $t[0] } }
+}
+if ($blocked) {
+    Write-Warning "Windows Smart App Control is blocking: $($blocked -join ', ')."
+    Info 'These are the open-source tools IRL Homekit runs (they are not signed with a paid certificate). Until they are'
+    Info 'allowed, the phone connection and auto-switching will not work. To allow them: Windows Security >'
+    Info 'App & browser control > Smart App Control settings > Off. Note: Windows does not let you turn it back on'
+    Info 'without resetting Windows. More: docs\TROUBLESHOOTING.md (Smart App Control).'
 }
 # Portable mode keeps this OBS's settings in $InstallDir\obs\config, apart from your normal OBS.
 Write-Utf8 "$InstallDir\obs\portable_mode.txt" ''

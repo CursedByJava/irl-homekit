@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Questions and help
+    url: https://github.com/CursedByJava/irl-homekit/discussions/categories/q-a
+    about: Ask how to set something up, or share your setup. Issues are for bugs.
   - name: Setup help
     url: https://github.com/CursedByJava/irl-homekit/blob/main/docs/TROUBLESHOOTING.md
     about: Common problems and fixes (ports, phone connection, domain, OBS).

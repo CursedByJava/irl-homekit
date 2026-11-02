@@ -13,8 +13,8 @@ $secrets = Get-Content "$root\secrets.json" -Raw | ConvertFrom-Json
 $settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
 $obsDir = $settings.obsDir
 $obsExe = Join-Path $obsDir 'obs64.exe'
-$node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
-if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
+$node = @("$root\node\node.exe", (Get-Command node.exe -ErrorAction SilentlyContinue).Source, "$env:ProgramFiles\nodejs\node.exe") |
+    Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1   # IRL Homekit's own copy first (see install.ps1)
 
 Add-Type -Namespace IRLHK -Name Win -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
@@ -86,13 +86,26 @@ function Rotate($file) {
 
 function Ensure($name, $exe, $argList, $workDir) {
     if (Get-Process -Name $name -ErrorAction SilentlyContinue) { return }
+    if ($script:blockedUntil[$name] -and (Get-Date) -lt $script:blockedUntil[$name]) { return }   # blocked: retry once a minute
     Rotate "$logs\$name.out.log"; Rotate "$logs\$name.err.log"
-    Log "starting $name"
+    if (-not $script:blockedUntil[$name]) { Log "starting $name" }
     $p = @{ FilePath = $exe; WorkingDirectory = $workDir; WindowStyle = 'Hidden'
             RedirectStandardOutput = "$logs\$name.out.log"; RedirectStandardError = "$logs\$name.err.log" }
     if ($argList) { $p.ArgumentList = $argList }
-    try { Start-Process @p } catch { Log "failed to start ${name}: $_" }
+    try {
+        Start-Process @p
+        if ($script:blockedUntil.ContainsKey($name)) { $script:blockedUntil.Remove($name); Save-Blocked; Log "$name is allowed now" }
+    } catch {
+        if ("$_" -match 'Application Control') {
+            # Windows Smart App Control blocks unsigned programs. The dashboard explains how to allow them.
+            if (-not $script:blockedUntil[$name]) { Log "Windows Smart App Control blocked $name" }
+            $script:blockedUntil[$name] = (Get-Date).AddMinutes(1); Save-Blocked
+        } else { Log "failed to start ${name}: $_" }
+    }
 }
+$script:blockedUntil = @{}
+function Save-Blocked { [IO.File]::WriteAllText("$logs\blocked.json", (ConvertTo-Json -Compress -InputObject @($script:blockedUntil.Keys))) }
+Save-Blocked
 
 # MediaMTX keeps its log file open, so it can only be rotated by restarting it. Do that only while no phone is connected.
 function Rotate-MediamtxLog {
