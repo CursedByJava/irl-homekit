@@ -11,6 +11,8 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.15] - 2026-11-03
+
 ### Added
 - **Sign in with Twitch.** Setup's channels page (and Start menu → *IRL Homekit - Connect Twitch*) signs you in with
   Twitch in one step: a small window shows a code, Twitch opens in your browser, you click *Authorize*. IRL Homekit
@@ -272,7 +274,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.14...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.15...HEAD
+[1.0.0-beta.15]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.14...v1.0.0-beta.15
 [1.0.0-beta.14]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.13...v1.0.0-beta.14
 [1.0.0-beta.13]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.12...v1.0.0-beta.13
 [1.0.0-beta.12]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.11...v1.0.0-beta.12
