@@ -738,6 +738,20 @@ Write-Host "    Password   $(if ($login -and $login.Generated) { $s.dashboardPas
 Write-Host "    Change it any time: Start menu > IRL Homekit - Change login."
 Write-Host "`nYour phone settings, passwords and the remaining steps ($(if ($RelayHost) { 'relay, ' } elseif (-not $portMapResult.ok) { 'router port forwarding, ' })auto sign-in) are in:"
 Write-Host "    $InstallDir\PHONE-SETUP.md" -ForegroundColor Yellow
+# In this window (the one-line install, Install IRL Homekit.cmd), not Setup.exe or the updater: copy a password we
+# made, and open the QR code for the phone (Setup.exe does both on its last page).
+if (-not $ResultFile -and -not $NonInteractive -and -not $SkipSystem) {
+    if ($login -and $login.Generated) {
+        try { Set-Clipboard -Value $s.dashboardPassword; Write-Host '    (The password is copied: paste it into your password manager.)' -ForegroundColor DarkGray } catch { }
+    }
+    if ($Domain) {
+        Write-Host "`nNext, on your phone:" -ForegroundColor Cyan
+        Write-Host '    A QR code opens in your browser now: point your phone''s camera at it and tap the link.'
+        Write-Host '    Your phone opens the dashboard signed in; tap Open in IRL Pro there and IRL Pro is set up.'
+        Write-Host '    Show it again any time: Start menu > IRL Homekit - Connect my phone.'
+        Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Show-PhoneQr.ps1`""
+    }
+}
 if ($ResultFile) {
     $result.ok = $true
     $result.installDir = $InstallDir; $result.guide = "$InstallDir\PHONE-SETUP.md"; $result.autoStart = $AutoStart

@@ -11,6 +11,11 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Changed
+- **The one-line install ends with the QR code too.** When it finishes (and the dashboard is set up for your phone),
+  the Connect your phone page opens in your browser by itself, and a password it made for you is copied, like
+  Setup.exe does.
+
 ## [1.0.0-beta.18] - 2026-11-03
 
 ### Fixed

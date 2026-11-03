@@ -11,4 +11,5 @@ if (-not (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Silen
     [void][Windows.Forms.MessageBox]::Show('IRL Homekit isn''t running yet. Open it (the IRL Homekit icon on the desktop), then try again.', 'IRL Homekit')
     exit 1
 }
-Start-Process "http://localhost:$port/pair"
+# Through Explorer: the browser opens as you, even when this runs from the installer (as administrator).
+Start-Process explorer.exe "http://localhost:$port/pair"
