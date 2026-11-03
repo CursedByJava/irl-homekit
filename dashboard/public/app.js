@@ -291,7 +291,7 @@ function dashboard() {
 
   let svcKey = '';
   function renderServices() {
-    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats) + JSON.stringify(s.remote) + JSON.stringify(s.blocked);
+    const sv = s.services || {}; const key = JSON.stringify(sv) + s.autoStart + JSON.stringify(s.stats) + JSON.stringify(s.remote) + JSON.stringify(s.blocked) + JSON.stringify(s.portMap);
     if (key === svcKey) return; svcKey = key;
     const rm = s.remote;
     if (rm) {
@@ -315,7 +315,10 @@ function dashboard() {
         + 'On the PC: Windows Security > App & browser control > Smart App Control settings > Off. IRL Homekit retries every minute.'
       : down.length ? down.length + ' part' + (down.length > 1 ? 's are' : ' is') + ' not running. IRL Homekit restarts them within 10–30 seconds.'
       : sv.router === false ? 'Everything is running, but the router didn\'t open the phone ports: see Router ports below.'
-      : 'Everything is running.' + (st.cpu != null ? ' OBS: ' + st.cpu + '% CPU, ' + st.fps + ' fps.' : '');
+      : 'Everything is running.' + (st.cpu != null ? ' OBS: ' + st.cpu + '% CPU, ' + st.fps + ' fps.' : '')
+        // Another device on the network had a phone port, so the router uses a different one (scripts/Set-IRLPortMap.ps1).
+        + ((s.portMap && s.portMap.moved && s.portMap.moved.length) ? ' Your phone uses a different port for ' + s.portMap.moved.join(', ')
+          + ' now (another device on your network has it): Phone settings > Open in IRL Pro updates your phone.' : '');
     const hb = $('healthBanner');
     if (st.renderSkipped > 0 && s.stream.active && st.fps && st.fps < 55) { hb.innerHTML = '<b>The home PC is struggling.</b> OBS is rendering at ' + st.fps + ' fps instead of 60. Close other programs on the PC.'; hb.classList.add('show'); }
     else hb.classList.remove('show');
@@ -444,6 +447,12 @@ function dashboard() {
         c.onclick = async () => { if (await copyText(p.irlPro)) toast('success', 'Copied.', 'Paste it in IRL Pro: Settings > Import/Export Settings > Import Settings.'); else toast('error', 'Couldn\'t copy.', 'Use Open in IRL Pro on your phone instead.'); };
         const btns = el('div', 'row'); btns.append(open, c);
         it.append(g, btns); $('phoneList').prepend(it);
+      }
+      if (p.moved && p.moved.length) {
+        const w = el('div', 'item'), g = el('div', 'grow');
+        g.append(el('div', 'title', 'Your phone port changed'), el('div', 'desc', 'Another device on your network already uses ' + p.moved.join(', ')
+          + ' on the router, so IRL Homekit picked a free port. The settings above already have it: if you set up your phone before, use Open in IRL Pro again (or change the port in IRL Pro).'));
+        w.append(el('span', 'status-dot warn'), g); $('phoneList').prepend(w);
       }
       if (p.ipChanged) {
         const w = el('div', 'item'), g = el('div', 'grow');

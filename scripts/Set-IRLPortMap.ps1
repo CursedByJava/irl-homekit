@@ -38,10 +38,18 @@ if (-not $Gateway) { $Gateway = "$($net.IPv4DefaultGateway.NextHop | Select-Obje
 
 # What the phone (and, with a domain, the remote dashboard) connects to. With a relay server nothing comes in
 # through the router, so any ports opened earlier are closed again.
-$ports = @(@{ Proto = 'UDP'; Port = 5000; What = 'bonded phone stream' }, @{ Proto = 'UDP'; Port = 8890; What = 'backup phone stream (SRT)' },
-           @{ Proto = 'TCP'; Port = 1935; What = 'backup phone stream (RTMP)' })
+# Port = on this PC; Ext = the outside port on the router. The phone's ports can use another outside port when another
+# device on the network already has theirs (Movable); the one picked is kept from then on (logs\portmap.json), so
+# the phone's settings stay the same. 443/80 can't move: certificates and browsers need exactly those.
+$ports = @(@{ Proto = 'UDP'; Port = 5000; What = 'bonded phone stream'; Movable = $true }, @{ Proto = 'UDP'; Port = 8890; What = 'backup phone stream (SRT)'; Movable = $true },
+           @{ Proto = 'TCP'; Port = 1935; What = 'backup phone stream (RTMP)'; Movable = $true })
 if (Test-Path "$InstallDir\caddy\Caddyfile") {
     $ports += @{ Proto = 'TCP'; Port = 443; What = 'remote dashboard (HTTPS)' }, @{ Proto = 'TCP'; Port = 80; What = 'remote dashboard (certificate)' }
+}
+$prevMap = try { Get-Content "$InstallDir\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
+foreach ($p in $ports) {
+    $was = @($prevMap.ports) | Where-Object { $_.proto -eq $p.Proto -and [int]$_.port -eq $p.Port -and $_.external } | Select-Object -First 1
+    $p.Ext = if ($was -and $p.Movable) { [int]$was.external } else { $p.Port }
 }
 if ($settings.relayHost -or "$($settings.portMap)" -eq 'Off') { $Remove = $true }
 
@@ -98,15 +106,28 @@ function Invoke-Upnp($r, $action, $fields) {
     $out
 }
 function Get-UpnpEntry($r, $p) {
-    Invoke-Upnp $r 'GetSpecificPortMappingEntry' ([ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Port; NewProtocol = $p.Proto })
+    Invoke-Upnp $r 'GetSpecificPortMappingEntry' ([ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Ext; NewProtocol = $p.Proto })
 }
 function Test-Forward($p) {
     if ($p.Proto -ne 'TCP' -or -not $state.externalIp -or -not (Get-NetTCPConnection -LocalPort $p.Port -State Listen -ErrorAction SilentlyContinue)) { return $false }
     $c = New-Object Net.Sockets.TcpClient
-    try { $c.ConnectAsync($state.externalIp, $p.Port).Wait(2000) -and $c.Connected } catch { $false } finally { $c.Close() }
+    try { $c.ConnectAsync($state.externalIp, $p.Ext).Wait(2000) -and $c.Connected } catch { $false } finally { $c.Close() }
+}
+# Another device has the phone's port on the router: use the next free outside port, leading to the same port here.
+function Set-UpnpPortAuto($r, $p) {
+    $res = Set-UpnpPort $r $p
+    if ($res.Ok -or -not $res.Taken -or -not $p.Movable) { return $res }
+    $wanted = $p.Ext
+    foreach ($try in ($p.Port + 1)..($p.Port + 20)) {
+        if ($try -eq $wanted -or @($ports | Where-Object { $_.Proto -eq $p.Proto -and $_.Ext -eq $try }).Count) { continue }
+        $p.Ext = $try
+        $next = Set-UpnpPort $r $p
+        if ($next.Ok -and -not $next.Manual) { $next.Note = "$wanted is taken by another device ($($res.Device)), so the phone uses $try"; $next.Moved = $true; return $next }
+    }
+    $p.Ext = $wanted; $res
 }
 function Set-UpnpPort($r, $p) {
-    $f = [ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Port; NewProtocol = $p.Proto; NewInternalPort = $p.Port; NewInternalClient = $lan
+    $f = [ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Ext; NewProtocol = $p.Proto; NewInternalPort = $p.Port; NewInternalClient = $lan
         NewEnabled = 1; NewPortMappingDescription = $Description; NewLeaseDuration = $LeaseSeconds }
     $a = Invoke-Upnp $r 'AddPortMapping' $f
     if ($a.Error -eq '725') { $f.NewLeaseDuration = 0; $a = Invoke-Upnp $r 'AddPortMapping' $f }   # router only takes permanent ones
@@ -114,7 +135,7 @@ function Set-UpnpPort($r, $p) {
     # Taken: fine if it already points at this PC (you forwarded it by hand), else another device has it.
     $e = Get-UpnpEntry $r $p
     if (-not $e.Error -and $e.NewInternalClient -eq $lan -and "$($e.NewInternalPort)" -eq "$($p.Port)") { return @{ Ok = $true; Note = 'already forwarded to this PC' } }
-    if (-not $e.Error -and $e.NewInternalClient) { return @{ Ok = $false; Note = "already forwarded to another device ($($e.NewInternalClient))" } }
+    if (-not $e.Error -and $e.NewInternalClient) { return @{ Ok = $false; Taken = $true; Device = $e.NewInternalClient; Note = "already forwarded to another device ($($e.NewInternalClient))" } }
     # Taken, but not by a UPnP entry: a forward made in the router's own settings (Verizon answers 729 for those).
     # A TCP port this PC already listens on is checked by connecting to the home's internet address.
     if ($a.Error -in '718', '729') {
@@ -128,11 +149,11 @@ function Set-UpnpPort($r, $p) {
 function Remove-UpnpPort($r, $p) {
     $e = Get-UpnpEntry $r $p   # only ours: a forward you made by hand stays
     if ($e.Error -or $e.NewPortMappingDescription -ne $Description -or $e.NewInternalClient -ne $lan) { return $false }
-    if (-not (Invoke-Upnp $r 'DeletePortMapping' ([ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Port; NewProtocol = $p.Proto })).Error) { return $true }
+    if (-not (Invoke-Upnp $r 'DeletePortMapping' ([ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Ext; NewProtocol = $p.Proto })).Error) { return $true }
     # Some routers (Verizon's, for one) answer DeletePortMapping with "invalid args" but do the IGD v2 range delete,
     # which only ever removes this PC's own entries (NewManage 0).
     if ($r.Type -notmatch ':2$') { return $false }
-    -not (Invoke-Upnp $r 'DeletePortMappingRange' ([ordered]@{ NewStartPort = $p.Port; NewEndPort = $p.Port; NewProtocol = $p.Proto; NewManage = 0 })).Error
+    -not (Invoke-Upnp $r 'DeletePortMappingRange' ([ordered]@{ NewStartPort = $p.Ext; NewEndPort = $p.Ext; NewProtocol = $p.Proto; NewManage = 0 })).Error
 }
 
 # ------------------------------------------------------------------ NAT-PMP (RFC 6886; Apple and some other routers)
@@ -156,14 +177,19 @@ function Get-NatPmpIp {
 }
 function Set-NatPmpPort($p, [int] $life) {
     $op = if ($p.Proto -eq 'UDP') { 1 } else { 2 }
-    $ext = if ($life) { $p.Port } else { 0 }
+    $ext = if ($life) { $p.Ext } else { 0 }
     $m = [byte[]](0, $op, 0, 0, ($p.Port -shr 8), ($p.Port -band 255), ($ext -shr 8), ($ext -band 255),
                   (($life -shr 24) -band 255), (($life -shr 16) -band 255), (($life -shr 8) -band 255), ($life -band 255))
     $r = Send-NatPmp $m 16
     if (-not $r) { return @{ Ok = $false; Note = 'no answer from the router' } }
     $rc = BE16 $r 2
     if ($rc -ne 0) { return @{ Ok = $false; Note = $(switch ($rc) { 2 { 'the router has it switched off' } 3 { 'the router is out of ports' } default { "the router refused (code $rc)" } }) } }
-    if ($life -and (BE16 $r 10) -ne $p.Port) { [void](Set-NatPmpPort $p 0); return @{ Ok = $false; Note = "the router offered port $(BE16 $r 10) instead (taken)" } }
+    $got = BE16 $r 10
+    if ($life -and $got -ne $p.Ext) {
+        # Taken: the router offers another outside port. Fine for the phone's ports (it leads to the same port here).
+        if ($p.Movable) { $wanted = $p.Ext; $p.Ext = $got; return @{ Ok = $true; Moved = $true; Note = "$wanted is taken by another device, so the phone uses $got" } }
+        [void](Set-NatPmpPort $p 0); return @{ Ok = $false; Note = "the router offered port $got instead (taken)" }
+    }
     @{ Ok = $true; Note = 'opened' }
 }
 
@@ -184,7 +210,7 @@ if ($router) {
 
 if ($Remove) {
     $closed = 0
-    if ($state.method -eq 'UPnP') { foreach ($p in $ports + @(@{ Proto = 'TCP'; Port = 443 }, @{ Proto = 'TCP'; Port = 80 })) { if (Remove-UpnpPort $router $p) { $closed++ } } }
+    if ($state.method -eq 'UPnP') { foreach ($p in $ports + @(@{ Proto = 'TCP'; Port = 443; Ext = 443 }, @{ Proto = 'TCP'; Port = 80; Ext = 80 })) { if (Remove-UpnpPort $router $p) { $closed++ } } }
     elseif ($state.method -eq 'NAT-PMP') { foreach ($p in $ports) { if ((Set-NatPmpPort $p 0).Ok) { $closed++ } } }
     $state.message = if ($closed) { "closed the $closed router port(s) IRL Homekit had opened" } else { 'no router ports to close' }
     Info $state.message
@@ -197,11 +223,16 @@ if (-not $state.method) {
     $state.message = "Your router didn't answer the request to open ports automatically. Turn on UPnP in the router's settings (often under Advanced, NAT or Gaming) and open IRL Homekit again, or forward the ports by hand (docs\ROUTER.md). If you already forwarded them, you're all set."
 } else {
     foreach ($p in $ports) {
-        $r = if ($state.method -eq 'UPnP') { Set-UpnpPort $router $p } else { Set-NatPmpPort $p $LeaseSeconds }
-        $state.ports += [ordered]@{ proto = $p.Proto; port = $p.Port; what = $p.What; ok = $r.Ok; manual = [bool]$r.Manual; unchecked = [bool]$r.Unchecked; note = $r.Note }
+        $r = if ($state.method -eq 'UPnP') { Set-UpnpPortAuto $router $p } else { Set-NatPmpPort $p $LeaseSeconds }
+        # A port moved earlier stays moved: say so on every renewal.
+        if ($r.Ok -and $p.Ext -ne $p.Port -and -not $r.Moved) { $r.Note = "opened as $($p.Ext) (the phone uses $($p.Ext); $($p.Port) is taken by another device)" }
+        $state.ports += [ordered]@{ proto = $p.Proto; port = $p.Port; external = $p.Ext; what = $p.What; ok = $r.Ok; manual = [bool]$r.Manual; unchecked = [bool]$r.Unchecked; note = $r.Note }
     }
     $failed = @($state.ports | Where-Object { -not $_.ok })
     $manual = @($state.ports | Where-Object { $_.manual })
+    $moved = @($state.ports | Where-Object { $_.ok -and $_.external -ne $_.port })
+    $movedNote = if ($moved) { ' Your phone uses ' + (($moved | ForEach-Object { "$($_.proto) $($_.external) instead of $($_.port)" }) -join ', ') +
+        ', because another device on your network has that port. The dashboard''s Phone settings (and its Open in IRL Pro link) already use the new one: if you set up your phone before, import them again.' } else { '' }
     $ext = "$($state.externalIp)"
     # The router's own internet address says whether anything outside can reach it.
     if ($ext -match '^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.') {
@@ -219,11 +250,12 @@ if (-not $state.method) {
         $list = if ($names.Count -gt 1) { ($names[0..($names.Count - 2)] -join ', ') + " and $($names[-1])" } else { $names[0] }
         $state.message = "Router ports ready ($($state.method)$(if ($state.router) { ", $($state.router)" })): $($state.ports.Count - $manual.Count) opened automatically; $list " +
             $(if (@($manual | Where-Object { $_.unchecked })) { "are forwarded in the router's own settings (make sure $(if ($names.Count -gt 1) { 'they point' } else { 'it points' }) at this PC, $lan)." }
-              else { "already forwarded to this PC in the router's own settings." })
+              else { "already forwarded to this PC in the router's own settings." }) + $movedNote
     } else {
         $state.ok = $true
-        $state.message = "Router ports opened automatically ($($state.method)$(if ($state.router) { ", $($state.router)" })): no port forwarding needed."
+        $state.message = "Router ports opened automatically ($($state.method)$(if ($state.router) { ", $($state.router)" })): no port forwarding needed." + $movedNote
     }
+    $state.moved = @($moved | ForEach-Object { "$($_.proto) $($_.port)" })
 }
 New-Item -ItemType Directory -Force "$InstallDir\logs" | Out-Null
 # The app's log (logs\watchdog.log) gets a line when the answer changes, not every renewal.

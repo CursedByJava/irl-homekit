@@ -67,7 +67,14 @@ $phoneHost = if ($duck) { $duck } elseif ($settings.relayHost) { $settings.relay
 
 Write-Host "`n== IRL Pro settings" -ForegroundColor Cyan
 if (-not $duck -and -not $settings.relayHost -and -not $ip) { Write-Host "  (could not check the current IP; showing the one from install: $($s.publicIp))" -ForegroundColor Yellow }
-Write-Host "  Bonded (main):  srtla://${phoneHost}:5000   passphrase: $($s.goirlPassphrase)"
-Write-Host "  Backup SRT:     srt://${phoneHost}:8890   stream id: publish:live:$($s.mediamtxUser):$($s.mediamtxPass)"
-Write-Host "  Backup RTMP:    rtmp://${phoneHost}:1935/live?user=$($s.mediamtxUser)&pass=$($s.mediamtxPass)"
+# The router may use another outside port for a phone port another device already had (Set-IRLPortMap.ps1).
+$ext = @{ 'UDP 5000' = 5000; 'UDP 8890' = 8890; 'TCP 1935' = 1935 }
+if (-not $settings.relayHost) {
+    $pmx = try { Get-Content "$root\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
+    foreach ($p in @($pmx.ports)) { $k = "$($p.proto) $($p.port)"; if ($ext.ContainsKey($k) -and $p.ok -and $p.external) { $ext[$k] = [int]$p.external } }
+}
+Write-Host "  Bonded (main):  srtla://${phoneHost}:$($ext['UDP 5000'])   passphrase: $($s.goirlPassphrase)"
+Write-Host "  Backup SRT:     srt://${phoneHost}:$($ext['UDP 8890'])   stream id: publish:live:$($s.mediamtxUser):$($s.mediamtxPass)"
+Write-Host "  Backup RTMP:    rtmp://${phoneHost}:$($ext['TCP 1935'])/live?user=$($s.mediamtxUser)&pass=$($s.mediamtxPass)"
+Write-Host '  Quickest on the phone: dashboard > Phone settings > Show > Open in IRL Pro.'
 Write-Host "`nLogs: $root\logs"

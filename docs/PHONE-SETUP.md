@@ -51,23 +51,23 @@ import. That adds both connections below with everything filled in. (Or copy the
 | Field | Value |
 |---|---|
 | Protocol | **SRTLA** |
-| Server | `srtla://{{PHONE_HOST}}:5000` |
+| Server | `srtla://{{PHONE_HOST}}:{{PORT_BONDED}}` |
 | Passphrase | `{{GOIRL_PASSPHRASE}}` |
 | Stream ID | (empty) |
 | Latency | `2000` ms (3000–4000 in crowded areas) |
 | Bonding | **ON** — Mobile data + Wi-Fi (+ USB/hotspot) |
 
-No separate passphrase field in your app version? Use `srtla://{{PHONE_HOST}}:5000?passphrase={{GOIRL_PASSPHRASE}}`.
+No separate passphrase field in your app version? Use `srtla://{{PHONE_HOST}}:{{PORT_BONDED}}?passphrase={{GOIRL_PASSPHRASE}}`.
 
 ### Connection 2 — Backup (plain SRT, no bonding)
 | Field | Value |
 |---|---|
 | Protocol | **SRT** |
-| Server | `srt://{{PHONE_HOST}}:8890` |
+| Server | `srt://{{PHONE_HOST}}:{{PORT_SRT}}` |
 | Stream ID | `publish:live:{{MEDIAMTX_USER}}:{{MEDIAMTX_PASS}}` |
 | Latency | `2000` ms |
 
-Last resort RTMP: `rtmp://{{PHONE_HOST}}:1935/live?user={{MEDIAMTX_USER}}&pass={{MEDIAMTX_PASS}}`
+Last resort RTMP: `rtmp://{{PHONE_HOST}}:{{PORT_RTMP}}/live?user={{MEDIAMTX_USER}}&pass={{MEDIAMTX_PASS}}`
 
 ### Video / audio
 - **1920×1080, 60 fps** (drop to 30 if the phone gets hot or signal is weak — OBS still outputs 60)

@@ -686,6 +686,10 @@ if ($SkipSystem) {
 Step 8 'Writing your personal phone guide'
 $guide = [IO.File]::ReadAllText("$repo\docs\PHONE-SETUP.md")
 $dash = if ($Domain) { "https://$Domain" } else { 'http://localhost:8090 (on this PC only)' }
+# Outside ports for the phone: the router may have given one of them a different number (scripts\Set-IRLPortMap.ps1).
+$phonePort = { param($proto, $port) $m = @($portMapResult.ports) | Where-Object { -not $RelayHost -and $_.proto -eq $proto -and [int]$_.port -eq $port -and $_.ok -and $_.external } | Select-Object -First 1
+    if ($m) { [string]$m.external } else { [string]$port } }
+foreach ($kv in ([ordered]@{ '{{PORT_BONDED}}' = (& $phonePort 'UDP' 5000); '{{PORT_SRT}}' = (& $phonePort 'UDP' 8890); '{{PORT_RTMP}}' = (& $phonePort 'TCP' 1935) }).GetEnumerator()) { $guide = $guide.Replace($kv.Key, $kv.Value) }
 foreach ($kv in ([ordered]@{ '{{PUBLIC_IP}}' = $(if ($public) { $public } else { '<your public IP>' }); '{{LAN_IP}}' = $lan; '{{GOIRL_PASSPHRASE}}' = $s.goirlPassphrase
     '{{MEDIAMTX_USER}}' = $s.mediamtxUser; '{{MEDIAMTX_PASS}}' = $s.mediamtxPass; '{{DASHBOARD_URL}}' = $dash; '{{DASHBOARD_USER}}' = $s.dashboardUser
     '{{STUDIO_URL}}' = $(if ($Domain) { "https://$studioDomain" } else { 'http://localhost:8090/studio (on this PC only)' })

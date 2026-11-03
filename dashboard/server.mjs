@@ -257,7 +257,7 @@ function pollServices() {
     if (!settings.relayHost && settings.portMap !== 'Off') {
       try {
         const pm = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'portmap.json'), 'utf8').replace(/^﻿/, ''));
-        state.portMap = { ok: !!pm.ok, problem: pm.problem || '', method: pm.method || '', message: pm.message || '' };
+        state.portMap = { ok: !!pm.ok, problem: pm.problem || '', method: pm.method || '', message: pm.message || '', moved: [].concat(pm.moved || []) };
         // A router that doesn't do automatic ports isn't an error: ports forwarded by hand work just as well.
         state.services.router = pm.problem === 'unsupported' ? null : !!pm.ok;
       } catch { }
@@ -872,20 +872,31 @@ async function phoneSettings() {
   if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) ip = '';
   const host = duck || relay || ip || sec.publicIp || '';
   const user = sec.mediamtxUser || 'irl', pass = sec.mediamtxPass || '', phrase = sec.goirlPassphrase || '';
+  // The router may use another outside port for a phone port another device already had (scripts/Set-IRLPortMap.ps1).
+  const ext = { 'UDP 5000': 5000, 'UDP 8890': 8890, 'TCP 1935': 1935 }, moved = [];
+  if (!relay) {
+    try {
+      for (const p of readJson(`${ROOT}/logs/portmap.json`).ports || []) {
+        const k = `${p.proto} ${p.port}`;
+        if (k in ext && p.ok && p.external) { ext[k] = +p.external; if (+p.external !== +p.port) moved.push(`${k} → ${p.external}`); }
+      }
+    } catch { }
+  }
+  const bp = ext['UDP 5000'], sp = ext['UDP 8890'], rp = ext['TCP 1935'];
   // IRL Pro (built on Larix Broadcaster) imports connections from a larix:// "Grove" link: the bonded one, and the
   // backup SRT one switched off. https://softvelum.com/larix/grove/
   const conn = (o) => Object.entries(o).map(([k, v]) => `conn[][${k}]=${encodeURIComponent(v)}`).join('&');
   const irlPro = host ? 'larix://set/v1?' + [
-    conn({ url: `srtla://${host}:5000`, name: 'IRL Homekit (bonded)', srtpass: phrase, srtlatency: 2000, srtmode: 'c', mode: 'va', overwrite: 'on', active: 'on' }),
-    conn({ url: `srt://${host}:8890`, name: 'IRL Homekit (backup)', srtstreamid: `publish:live:${user}:${pass}`, srtlatency: 2000, srtmode: 'c', mode: 'va', overwrite: 'on', active: 'off' }),
+    conn({ url: `srtla://${host}:${bp}`, name: 'IRL Homekit (bonded)', srtpass: phrase, srtlatency: 2000, srtmode: 'c', mode: 'va', overwrite: 'on', active: 'on' }),
+    conn({ url: `srt://${host}:${sp}`, name: 'IRL Homekit (backup)', srtstreamid: `publish:live:${user}:${pass}`, srtlatency: 2000, srtmode: 'c', mode: 'va', overwrite: 'on', active: 'off' }),
   ].join('&') : '';
   return {
     irlPro,
-    host, duckdns: !!duck, relay: !!relay,
+    host, duckdns: !!duck, relay: !!relay, moved,
     ipChanged: !duck && !relay && !!ip && !!sec.publicIp && ip !== sec.publicIp, installIp: sec.publicIp || '',
-    bonded: { server: `srtla://${host}:5000`, passphrase: phrase, combined: `srtla://${host}:5000?passphrase=${phrase}` },
-    srt: { server: `srt://${host}:8890`, streamId: `publish:live:${user}:${pass}` },
-    rtmp: { url: `rtmp://${host}:1935/live?user=${user}&pass=${pass}` },
+    bonded: { server: `srtla://${host}:${bp}`, passphrase: phrase, combined: `srtla://${host}:${bp}?passphrase=${phrase}` },
+    srt: { server: `srt://${host}:${sp}`, streamId: `publish:live:${user}:${pass}` },
+    rtmp: { url: `rtmp://${host}:${rp}/live?user=${user}&pass=${pass}` },
   };
 }
 

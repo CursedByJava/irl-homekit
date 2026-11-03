@@ -11,6 +11,13 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Changed
+- **A phone port another device already has no longer stops your stream.** If something else on your network (a
+  game console, a NAS, ...) already has UDP 5000, 8890 or TCP 1935 on the router, IRL Homekit now uses the next free
+  outside port, leading to the same port on this PC, and keeps it from then on. The dashboard's Phone settings and
+  its *Open in IRL Pro* link, Status and PHONE-SETUP.md all give the new port, and the dashboard says it changed.
+  (The remote dashboard's 443 and 80 can't move: certificates need exactly those.)
+
 ## [1.0.0-beta.15] - 2026-11-03
 
 ### Added
