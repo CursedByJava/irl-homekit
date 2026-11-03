@@ -36,7 +36,7 @@ jobs:
           ver="${{ steps.v.outputs.ver }}"
           awk -v v="$ver" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > notes.md
           test -s notes.md || { echo "No '## [$ver]' section in CHANGELOG.md"; exit 1; }
-          printf '\n---\n**Install:** download **IRL-Homekit-Setup-'"$ver"'.exe** below and run it (Windows may say it is from an unknown publisher: More info > Run anyway). If Windows blocks it outright (Smart App Control), download the source code zip instead, extract it and double-click `Install IRL Homekit.cmd`: it installs the same way.\n**Update:** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
+          printf '\n---\n**Install:** download **IRL-Homekit-Setup-'"$ver"'.exe** below and run it (Windows may say it is from an unknown publisher: More info > Run anyway). If Windows blocks it outright (Smart App Control), install with one line instead: open PowerShell and paste `irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex` (same installer).\n**Update:** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
       - name: Create release
         if: steps.v.outputs.exists != 'true'
         run: |

@@ -14,8 +14,10 @@ It asks a few questions (none with -NonInteractive, which is what Setup.exe and 
   4. Adds firewall rules, stops the PC sleeping, and adds IRL Homekit to the Start menu, the desktop and
      Settings > Apps (with an uninstaller). It opens by itself when you sign in unless you pass -AutoStart Off.
   5. Writes PHONE-SETUP.md in the install folder with your personal IRL Pro settings.
-  6. With -RelayHost: connects to your relay server (a free cloud VM, docs/RELAY.md) instead of needing router
-     port forwarding.
+  6. Asks your router to open the phone's ports by itself (UPnP / NAT-PMP, scripts\Set-IRLPortMap.ps1), so most
+     people need no port forwarding; it says so when the router can't (then: forward them by hand, docs/ROUTER.md).
+     With -RelayHost it connects to your relay server instead (a free cloud VM, docs/RELAY.md): for internet
+     providers that share one public address between homes (carrier-grade NAT), where nothing else works.
 Secrets are never passed on the command line: Setup.exe hands them over in environment variables
 (IRLHK_DASHBOARD_PASSWORD, IRLHK_DUCKDNS_TOKEN, IRLHK_RELAY_TOKEN).
 Re-running it is safe: existing passwords, stream keys and your start-at-sign-in choice are kept.
@@ -50,6 +52,8 @@ param(
     [string] $DuckDnsToken = '',
     # Public IP (or name) of your relay server, so your router needs no port forwarding (docs/RELAY.md). 'off' turns it off.
     [string] $RelayHost = '',
+    # Open the phone's ports on your router automatically (UPnP / NAT-PMP). New installs: Auto. Re-runs keep the choice.
+    [ValidateSet('', 'Auto', 'Off')] [string] $PortMap = '',
     # Setup.exe: write a summary of the result (key<TAB>value lines) to this file at the end.
     [string] $ResultFile = '',
     # Setup.exe: the wizard's answers (JSON, UTF-8), same names as these parameters. Avoids command-line quoting.
@@ -68,7 +72,7 @@ if ($AnswersFile) {
             { $_ -in 'ImportObs', 'NonInteractive' } { Set-Variable $p.Name ([switch][bool]$p.Value); break }
             'OverlaySources' { $OverlaySources = @($p.Value | Where-Object { $_ }); break }
             { $_ -in 'InstallDir', 'TwitchChannel', 'Domain', 'BaseCollection', 'BaseProfile', 'AutoStart', 'KickChannel', 'YoutubeChannelId',
-                'DashboardUser', 'DuckDnsName', 'RelayHost', 'BrbBackground', 'CustomName', 'CustomServer' } { Set-Variable $p.Name ([string]$p.Value); break }
+                'DashboardUser', 'DuckDnsName', 'RelayHost', 'BrbBackground', 'CustomName', 'CustomServer', 'PortMap' } { Set-Variable $p.Name ([string]$p.Value); break }
             default { Write-Warning "answers file: ignoring unknown setting '$($p.Name)'" }
         }
     }
@@ -139,6 +143,7 @@ if ($prev) {
     if (-not $YoutubeChannelId) { $YoutubeChannelId = $prev.youtubeChannelId }
     if (-not $DuckDnsName) { $DuckDnsName = $prev.duckdnsName }
     if (-not $RelayHost) { $RelayHost = $prev.relayHost }
+    if (-not $PortMap) { $PortMap = $prev.portMap }
     if ($prev.baseObsConfigDir -and -not $PSBoundParameters.ContainsKey('BaseObsConfigDir')) { $BaseObsConfigDir = $prev.baseObsConfigDir }
 }
 # IRL Homekit runs its own portable OBS from the install folder; your normal OBS is only read from.
@@ -254,6 +259,7 @@ if ($DuckDnsName -and -not $DuckDnsToken -and -not $oldSecrets.duckdnsToken) {
 }
 # Studio sits next to the dashboard: irl.example.com -> studio.example.com. A bare DuckDNS name has no siblings
 # you control, so yourname.duckdns.org -> studio.yourname.duckdns.org (DuckDNS answers for every name under yours).
+if (-not $PortMap) { $PortMap = 'Auto' }
 $RelayHost = "$RelayHost".Trim().ToLower() -replace '^[a-z]+://', '' -replace '[:/].*$', ''
 if ($RelayHost -eq 'off') { $RelayHost = '' }
 if ($RelayHost -and $RelayHost -notmatch '^(\d{1,3}(\.\d{1,3}){3}|[a-z0-9-]+(\.[a-z0-9-]+)+)$') { throw "Relay server '$RelayHost' is not an IP address or host name." }
@@ -409,7 +415,7 @@ $settings = [ordered]@{
     obsDir = $ObsDir; obsConfigDir = $ObsConfigDir; baseObsConfigDir = $BaseObsConfigDir; obsWebsocketPort = $ObsWsPort; obsProfile = $ObsName; obsCollection = $ObsName; domain = $Domain; twitchChannel = $TwitchChannel.ToLower()
     phoneInputs = @('IRL Phone (Bonded)', 'IRL Phone (Backup)'); overlayInputs = @($OverlaySources); audioInputs = $audio
     autoScenes = @('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)')
-    studioDomain = $studioDomain; duckdnsName = $DuckDnsName; relayHost = $RelayHost; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
+    studioDomain = $studioDomain; duckdnsName = $DuckDnsName; relayHost = $RelayHost; portMap = $PortMap; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
     streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true; custom = $true } })   # dashboard's "Stream to" switches
 }
 Write-Utf8 "$InstallDir\settings.json" ($settings | ConvertTo-Json -Depth 5)
@@ -624,6 +630,7 @@ if ($Domain) {
 }
 
 # ------------------------------------------------------------------ 7. system
+$portMapResult = $null
 if ($SkipSystem) {
     Step 7 'Skipping firewall / power / task / plugin install (-SkipSystem)'
 } else {
@@ -641,6 +648,14 @@ if ($SkipSystem) {
         New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -Action Allow -Program $r.Program -Protocol $r.Protocol -LocalPort $r.Port -Profile Any | Out-Null
     }
     Info 'firewall rules added'
+    # Router ports: opened automatically unless there's a relay (nothing comes in through the router then, so
+    # anything opened before is closed again) or it's switched off.
+    try { $portMapResult = & "$InstallDir\scripts\Set-IRLPortMap.ps1" -InstallDir $InstallDir -Quiet }
+    catch { $portMapResult = $null; Write-Warning "Couldn't ask the router to open ports: $($_.Exception.Message)" }
+    if ($portMapResult -and -not $RelayHost -and $PortMap -ne 'Off') {
+        if ($portMapResult.ok) { Info $portMapResult.message }
+        else { $result.warnings += $portMapResult.message; Write-Warning $portMapResult.message }
+    }
     powercfg /change standby-timeout-ac 0; powercfg /change hibernate-timeout-ac 0; powercfg /change monitor-timeout-ac 15
     Info 'sleep and hibernate disabled while plugged in'
 
@@ -669,6 +684,11 @@ foreach ($kv in ([ordered]@{ '{{PUBLIC_IP}}' = $(if ($public) { $public } else {
     '{{STUDIO_URL}}' = $(if ($Domain) { "https://$studioDomain" } else { 'http://localhost:8090/studio (on this PC only)' })
     '{{PHONE_HOST}}' = $(if ($DuckDnsName -and $s.duckdnsToken) { "$DuckDnsName.duckdns.org" } elseif ($RelayHost) { $RelayHost } elseif ($public) { $public } else { '<your public IP>' })
     '{{RELAY_HOST}}' = $RelayHost
+    '{{ROUTER_PORTS}}' = $(if ($portMapResult.ok) { "IRL Homekit opened these on your router by itself ($($portMapResult.method)) and keeps them open while it runs: nothing to do." }
+        elseif ($portMapResult.message) { "$($portMapResult.message) The ports, all to this PC (``$lan``):" }
+        else { "forward these to this PC (``$lan``). See ``docs/ROUTER.md`` in the IRL Homekit repo for router-by-router steps." })
+    '{{ROUTER_AFTER}}' = $(if ($portMapResult.ok) { "If your phone ever can't connect from outside your home, forward them by hand to this PC (``$lan``): ``docs/ROUTER.md``." }
+        else { "Also give this PC a **DHCP reservation** so it keeps ``$lan``." })
     '{{DASHBOARD_PASS}}' = $s.dashboardPassword; '{{INSTALL_DIR}}' = $InstallDir }).GetEnumerator()) { $guide = $guide.Replace($kv.Key, $kv.Value) }
 # Keep the router or the relay instructions, whichever applies.
 $drop = if ($RelayHost) { 'router' } else { 'relay' }
@@ -703,7 +723,7 @@ if ($Domain) { Write-Host "    Studio     https://$studioDomain" }
 Write-Host "    Username   $($s.dashboardUser)"
 Write-Host "    Password   $(if ($login -and $login.Generated) { $s.dashboardPassword } elseif ($login) { '(the one you chose)' } else { '(unchanged)' })"
 Write-Host "    Change it any time: Start menu > IRL Homekit - Change login."
-Write-Host "`nYour phone settings, passwords and the remaining steps ($(if ($RelayHost) { 'relay' } else { 'router port forwarding' }), auto sign-in) are in:"
+Write-Host "`nYour phone settings, passwords and the remaining steps ($(if ($RelayHost) { 'relay, ' } elseif (-not $portMapResult.ok) { 'router port forwarding, ' })auto sign-in) are in:"
 Write-Host "    $InstallDir\PHONE-SETUP.md" -ForegroundColor Yellow
 if ($ResultFile) {
     $result.ok = $true
@@ -712,6 +732,9 @@ if ($ResultFile) {
     $result.username = $s.dashboardUser
     $result.password = $(if ($login -and $login.Generated) { $s.dashboardPassword } else { '' })   # only one we made up
     $result.relayHost = $RelayHost; $result.relayConnected = $relayOk
+    # Router ports opened automatically: True / False, with what to do about it (empty with a relay or -SkipSystem).
+    $result.portMapOk = $(if ($portMapResult -and -not $RelayHost -and $PortMap -ne 'Off') { [bool]$portMapResult.ok } else { '' })
+    $result.portMapProblem = "$($portMapResult.problem)"
     # key<TAB>value lines (UTF-8 with BOM), easy for Setup.exe to read; one "warning" line per warning.
     $out = foreach ($k in $result.Keys) { if ($k -eq 'warnings') { foreach ($w in $result.warnings) { "warning`t$w" } } else { "$k`t$($result[$k])" } }
     [IO.File]::WriteAllLines($ResultFile, [string[]]$out, (New-Object Text.UTF8Encoding $true))

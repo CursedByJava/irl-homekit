@@ -1,7 +1,14 @@
 # Router setup
 
 Your phone connects to your home PC over the internet, so your router must pass these ports to the PC.
-Can't change router settings, or your provider uses CGNAT? Use a free relay server instead: [RELAY.md](RELAY.md).
+
+**Usually you don't need this page:** IRL Homekit asks the router to open them by itself (UPnP / NAT-PMP, which
+most home routers have on) and keeps them open while it runs. Setup, Start menu → *IRL Homekit - Status* and the
+dashboard (*Home PC → Router ports*) say whether that worked. Use the steps below when they say it didn't, or turn
+on **UPnP** in the router's settings instead (often under *Advanced*, *NAT* or *Gaming*), then open IRL Homekit again.
+
+Status says your router's internet address is a private one or that your provider uses carrier-grade NAT? Then
+forwarding ports can't help; use a free relay server instead: [RELAY.md](RELAY.md).
 
 | Protocol | Port | Needed for |
 |---|---|---|

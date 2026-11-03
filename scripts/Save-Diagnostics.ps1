@@ -31,6 +31,12 @@ $summary.Add("  dashboard  $(if (Get-NetTCPConnection -LocalPort 8090 -State Lis
 $summary.Add('')
 $summary.Add('Tasks:')
 Get-ScheduledTask -TaskName 'IRL Homekit*' -ErrorAction SilentlyContinue | ForEach-Object { $summary.Add("  $($_.TaskName): $($_.State)") }
+# Router ports (scripts\Set-IRLPortMap.ps1), without your home's internet address.
+$pm = try { Get-Content "$InstallDir\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
+if ($pm) {
+    $summary.Add(''); $summary.Add("Router ports: $(if ($pm.ok) { 'opened' } else { "NOT opened ($($pm.problem))" }) via $(if ($pm.method) { $pm.method } else { 'nothing' }) $($pm.router), checked $($pm.time)")
+    foreach ($p in @($pm.ports)) { $summary.Add("  $($p.proto) $($p.port): $($p.note)") }
+}
 [IO.File]::WriteAllLines("$work\summary.txt", $summary)
 
 Copy-Item "$InstallDir\settings.json" "$work\settings.json"

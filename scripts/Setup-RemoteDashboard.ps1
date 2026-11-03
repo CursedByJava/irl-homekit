@@ -132,6 +132,10 @@ if ($mode -in 'duck', 'own', 'off') {
         $g = $g -replace '(?m)^\| Studio \| \*\*[^*]*\*\* \|', ('| Studio | **' + $(if ($newDomain) { "https://$($settings.studioDomain)" } else { 'http://localhost:8090/studio (on this PC only)' }) + '** |')
         [IO.File]::WriteAllText($guide, $g, $utf8)
     }
+    # Router ports 80/443 (scripts\Set-IRLPortMap.ps1): opened, or closed again, along with the phone's ports.
+    if (-not $relayHost -and "$($settings.portMap)" -ne 'Off' -and (Test-Path "$InstallDir\scripts\Set-IRLPortMap.ps1")) {
+        try { $pm = & "$InstallDir\scripts\Set-IRLPortMap.ps1" -InstallDir $InstallDir -Quiet; if ($pm.ok) { Ok $pm.message } } catch { }
+    }
     # Restart the web server and dashboard with the new settings (IRL Homekit starts them again within seconds).
     Get-Process caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force
     $dash = (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
@@ -192,6 +196,8 @@ if (-not $certOk -and $dnsOk -and $relayHost) {
     Say 'On Oracle Cloud: your VM > Subnet > Security list > Add ingress rules for TCP 80 and TCP 443 (source 0.0.0.0/0).'
     Say 'Also check Status (Start menu) shows the relay as connected. Step by step: docs\RELAY.md'
 } elseif (-not $certOk -and $dnsOk) {
+    $pm = try { Get-Content "$InstallDir\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
+    if ($pm -and -not $pm.ok -and $pm.problem -ne 'unsupported') { Say $pm.message }
     Say "On your router, forward TCP 80 and TCP 443 to this PC ($lan). Router steps: docs\ROUTER.md"
     if ($interactive -and $gateway -and (Read-Host "Open your router's page ($gateway) now? (Y/n)") -notmatch '^n') { Start-Process "http://$gateway" }
 }

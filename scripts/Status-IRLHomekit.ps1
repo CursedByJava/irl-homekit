@@ -34,6 +34,18 @@ if ($settings.relayHost) {
     else { Write-Host '  NOT connected: the relay doesn''t answer. Check the VM is running and its security list lets UDP 51820 in (docs\RELAY.md).' -ForegroundColor Red }
 }
 
+if (-not $settings.relayHost -and "$($settings.portMap)" -ne 'Off') {
+    Write-Host "`n== Router ports (automatic)" -ForegroundColor Cyan
+    # Opened by the app itself (scripts\Set-IRLPortMap.ps1), renewed every 20 minutes while it runs.
+    $pm = try { Get-Content "$root\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
+    if (-not $pm) { Write-Host '  not checked yet (open IRL Homekit)' -ForegroundColor Yellow }
+    else {
+        Write-Host "  $($pm.message)" -ForegroundColor $(if ($pm.ok) { 'Green' } elseif ($pm.problem -eq 'unsupported') { 'Yellow' } else { 'Red' })
+        foreach ($p in @($pm.ports)) { Write-Host ("    {0,-3} {1,-5} {2}" -f $p.proto, $p.port, $p.note) -ForegroundColor $(if ($p.ok) { 'Gray' } else { 'Red' }) }
+        Write-Host "  (checked $(([datetime]$pm.time).ToString('g')))" -ForegroundColor DarkGray
+    }
+}
+
 Write-Host "`n== Public IP" -ForegroundColor Cyan
 # The phone connects to the DuckDNS name if there is one (it follows the home IP, or the relay), else to the relay,
 # else to the home IP as it is now. Same rule as the personal guide (PHONE-SETUP.md) and the dashboard's Phone settings card.

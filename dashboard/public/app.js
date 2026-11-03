@@ -23,6 +23,7 @@ function dashboard() {
     noalbs: ['Auto-switcher (NOALBS)', 'Switches LIVE / LOW / BRB scenes based on your signal.'],
     caddy: ['Web server (Caddy)', 'Serves this page securely over HTTPS from your home PC.'],
     relay: ['Relay connection (WireGuard)', 'Connects this PC to your relay server, which receives the phone stream (no router port forwarding).'],
+    router: ['Router ports (automatic)', 'IRL Homekit keeps the phone ports open on your home router by itself (UPnP), so no port forwarding is needed.'],
   };
   let s = null; let lastMsg = 0; let busy = false;
 
@@ -265,7 +266,8 @@ function dashboard() {
         : rm.ok ? 'Working at ' + rm.domain + ' and ' + rm.studio + ' (HTTPS).'
         : rm.problem + ' Then run "IRL Homekit - Set up remote dashboard" on the PC to check again.';
     }
-    const down = Object.keys(SERVICE_INFO).filter((k) => sv[k] === false);
+    // The router isn't a program IRL Homekit restarts; its problem is explained on its own line below.
+    const down = Object.keys(SERVICE_INFO).filter((k) => sv[k] === false && k !== 'router');
     const st = s.stats || {};
     const as = $('autoStart');
     as.classList.toggle('muted', !s.autoStart); as.textContent = s.autoStart ? 'On' : 'Off'; as.setAttribute('aria-pressed', String(!!s.autoStart));
@@ -277,6 +279,7 @@ function dashboard() {
       ? 'Windows is blocking ' + blocked.join(', ') + ' (Smart App Control blocks open-source tools without a paid signature). '
         + 'On the PC: Windows Security > App & browser control > Smart App Control settings > Off. IRL Homekit retries every minute.'
       : down.length ? down.length + ' part' + (down.length > 1 ? 's are' : ' is') + ' not running. IRL Homekit restarts them within 10–30 seconds.'
+      : sv.router === false ? 'Everything is running, but the router didn\'t open the phone ports: see Router ports below.'
       : 'Everything is running.' + (st.cpu != null ? ' OBS: ' + st.cpu + '% CPU, ' + st.fps + ' fps.' : '');
     const hb = $('healthBanner');
     if (st.renderSkipped > 0 && s.stream.active && st.fps && st.fps < 55) { hb.innerHTML = '<b>The home PC is struggling.</b> OBS is rendering at ' + st.fps + ' fps instead of 60. Close other programs on the PC.'; hb.classList.add('show'); }
@@ -285,10 +288,17 @@ function dashboard() {
       const it = el('div', 'item'); const ok = sv[k];
       // The relay is a server out on the internet: when it doesn't answer, it's usually the VM, not this PC.
       const downText = k === 'relay' ? 'Your relay server doesn\'t answer. Check the VM is running and its security list lets UDP 51820 in (docs/RELAY.md).'
+        : k === 'router' ? ((s.portMap && s.portMap.message) || 'The router didn\'t open the ports.')
         : 'Not running. Restarting automatically…';
-      const g = el('div', 'grow'); g.append(el('div', 'title', title), el('div', 'desc', ok === false ? downText : d));
+      const g = el('div', 'grow'); g.append(el('div', 'title', title), el('div', 'desc', ok === false || (k === 'router' && !ok) ? downText : d));
       it.append(el('span', 'status-dot ' + (ok ? 'ok' : ok === false ? 'bad' : '')), g);
-      if (k !== 'obs') {
+      if (k === 'router') {
+        if (!ok) {
+          const b = el('button', 'btn small ghost', 'Try again');
+          b.onclick = () => act({ action: 'restartService', service: k }, 'Asking the router again…', 'Your stream isn\'t affected.');
+          it.append(b);
+        }
+      } else if (k !== 'obs') {
         const b = el('button', 'btn small ghost', 'Restart');
         b.onclick = async () => {
           const what = {

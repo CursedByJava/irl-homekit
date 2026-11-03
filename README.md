@@ -43,7 +43,8 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
 | ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" warning (small, bottom-left) | `overlays/` (OBS browser sources) |
 | ✅ | Free HTTPS on your own domain | [Caddy](https://caddyserver.com) + Let's Encrypt |
-| ✅ | No port forwarding needed (optional): a free relay server in front of your PC, also hides your home IP | [WireGuard](https://www.wireguard.com) to a VM on Oracle Cloud Always Free, see [RELAY.md](docs/RELAY.md) |
+| ✅ | No port forwarding and no accounts for most people: IRL Homekit opens its ports on your router by itself | UPnP / NAT-PMP, `scripts/Set-IRLPortMap.ps1` |
+| ✅ | Internet that can't take incoming streams (carrier-grade NAT, some 5G home internet, Starlink): a free relay server in front of your PC, also hides your home IP | [WireGuard](https://www.wireguard.com) to a VM on Oracle Cloud Always Free, see [RELAY.md](docs/RELAY.md) |
 | ✅ | A normal Windows setup wizard | `installer/` ([Inno Setup](https://jrsoftware.org/isinfo.php)) |
 | ✅ | Starts with Windows (optional), restarts anything that crashes | `scripts/Start-IRLHomekit.ps1` |
 
@@ -55,8 +56,10 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Sup
   IRL Homekit brings its own copy. If you already use OBS, the installer can copy your scenes and settings from it.
 - Windows 11 *Smart App Control* must allow IRL Homekit's open-source tools. The installer checks this and tells you if it
   doesn't ([details](docs/TROUBLESHOOTING.md#windows-blocks-the-tools-smart-app-control)).
-- A home connection with a **public IPv4** you can port-forward (most fiber/cable; see [ROUTER.md](docs/ROUTER.md)), **or** a
-  free relay server if you can't forward ports or are behind CGNAT ([RELAY.md](docs/RELAY.md), Setup walks you through it)
+- A home connection with a **public IPv4** (most fiber, cable and DSL). IRL Homekit asks your router to open its
+  ports by itself (UPnP, on by default on most home routers), so there's usually nothing to set up. If the router
+  doesn't do that, you forward the ports by hand ([ROUTER.md](docs/ROUTER.md)). If your provider shares one address
+  between homes (carrier-grade NAT; Setup tells you), use a free relay server instead ([RELAY.md](docs/RELAY.md))
 - Optional, to reach the dashboard from your phone anywhere: a **free** name from [DuckDNS](https://www.duckdns.org) or a
   domain you own (about $10/year). A guided setup does the rest: see [Remote dashboard](#remote-dashboard).
 - Optional for the self-test: ffmpeg, `winget install Gyan.FFmpeg`
@@ -68,14 +71,25 @@ Nothing else to install: IRL Homekit brings its own copy of Node.js (for the das
 **Easiest:** download **`IRL-Homekit-Setup-<version>.exe`** from the [latest release](https://github.com/CursedByJava/irl-homekit/releases)
 and run it. It's a normal setup wizard: your channels (all optional: skip them and add them later), an optional
 custom destination, which OBS scenes and overlays to bring over, a dashboard login, how your phone reaches the PC
-(router port forwarding, or a free relay server with no port forwarding), the remote dashboard, and start with
-Windows. Then it installs everything with a progress bar and shows your login and next steps. Running it again
+(through your home router, which IRL Homekit opens by itself, or a relay server), the remote dashboard, and start
+with Windows. Then it installs everything with a progress bar and shows your login and next steps. Running it again
 updates IRL Homekit and keeps your settings, or changes your channels and connection if you tick those boxes.
 (Setup.exe isn't code-signed yet, so Windows may say "unknown publisher": **More info → Run anyway**. On PCs with
-Smart App Control on, Windows can block it outright: then use the source code install below, which does exactly
+Smart App Control on, Windows can block it outright: then use the one-line install below, which does exactly
 the same.)
 Run it while signed in to the Windows account you stream from, and make that an administrator account: if Windows
 asks for a *different* account's password, IRL Homekit gets set up for that account instead.
+
+**Or with one line** (nothing to download by hand, and Smart App Control has nothing to block): right-click the
+Start button → **Terminal** (or open **PowerShell**), paste this and press Enter:
+
+```powershell
+irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex
+```
+
+It downloads the newest release from GitHub ([get.ps1](get.ps1), short enough to read first) and starts the
+installer: click **Yes** when Windows asks for permission, then answer its questions in the window that opens (the
+same ones as in step 2 below). Running it again updates IRL Homekit.
 
 **Or from the source code** (same result, questions in a console window):
 
@@ -88,7 +102,8 @@ asks for a *different* account's password, IRL Homekit gets set up for that acco
      [remote dashboard](#remote-dashboard).
    - When it's done, IRL Homekit opens.
 3. Open `C:\IRLHomekit\PHONE-SETUP.md`. It has **your** IRL Pro settings, passwords and the last manual steps:
-   router port forwarding ([ROUTER.md](docs/ROUTER.md)), your Twitch stream key, and optional Kick/YouTube keys.
+   your Twitch stream key, optional Kick/YouTube keys, and router port forwarding only if your router couldn't open
+   the ports by itself ([ROUTER.md](docs/ROUTER.md)).
    Need the IRL Pro settings again later? They're on the dashboard (**Phone settings** → Show, with copy buttons) and in
    Start menu → *IRL Homekit - Status*.
 4. Go live from your phone with Wi-Fi off to prove it works from outside.
@@ -105,7 +120,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 Options (all optional): `-InstallDir`, `-TwitchChannel`, `-Domain`, `-DashboardUser`, `-BaseCollection`,
-`-BaseProfile`, `-ImportObs`, `-AutoStart On|Off`, `-BaseObsConfigDir`, `-DuckDnsName`, `-DuckDnsToken`,
+`-BaseProfile`, `-ImportObs`, `-AutoStart On|Off`, `-PortMap Auto|Off` (router ports), `-RelayHost`, `-BaseObsConfigDir`, `-DuckDnsName`, `-DuckDnsToken`,
 `-OverlaySources "Chat,Alerts"`, `-BrbBackground "<media source>"`, `-ObsName`, `-NonInteractive`.
 </details>
 
@@ -160,8 +175,8 @@ and reopens IRL Homekit, in about 2 minutes. While IRL Homekit is a beta you get
 
 **Settings → Apps → IRL Homekit → Uninstall** (or Start menu → *IRL Homekit - Uninstall*). It closes IRL Homekit
 and removes its shortcuts, tasks, firewall rules and app entry, and asks whether to delete `C:\IRLHomekit` too.
-Your regular OBS isn't touched. Remember to remove the port forwards on your router (or delete the relay VM in Oracle
-Cloud if you used one).
+Your regular OBS isn't touched. Router ports IRL Homekit opened itself are closed again; if you forwarded ports by
+hand, remove those forwards on your router (or delete the relay VM in Oracle Cloud if you used one).
 ## Remote dashboard
 
 Reach your dashboard and Studio from your phone anywhere at `https://your-name...`, with a free HTTPS certificate.
@@ -240,6 +255,7 @@ Connecting Kick and YouTube uses your own free developer app on each platform. S
 | NOALBS | — | Reads go-irl/MediaMTX stats; LOW < 1000 kbps, BRB < 300 kbps; ends stream after 20 min on BRB |
 | Dashboard | 127.0.0.1:8090 | `dashboard/server.mjs`, Node built-ins only |
 | Caddy | TCP 443/80 (public) | Automatic Let's Encrypt certificate |
+| Router ports | UPnP / NAT-PMP to your router (local network only) | `scripts/Set-IRLPortMap.ps1` opens the public ports above on your router for 2 hours at a time and the app renews them while it runs; off with a relay. Status and the dashboard show the result |
 | Relay tunnel (optional) | outgoing UDP 51820 to your relay | Only with a relay server ([RELAY.md](docs/RELAY.md)): a WireGuard tunnel (Windows service); the relay receives the public ports above and passes them to this PC |
 | App | — | `scripts/Start-IRLHomekit.ps1`: opens the OBS, keeps every part running, stops everything when the OBS closes |
 
@@ -283,6 +299,7 @@ It only connects to:
 - **Let's Encrypt**: only with the remote dashboard, for its HTTPS certificate (through Caddy).
 - **Twitch, Kick, YouTube / Google**: only for the platforms you connect in Studio, to show live status, chat and
   titles; and TwitchTokenGenerator (twitchtokengenerator.com) to refresh the Twitch chat token if you set it up.
+- **Your home router**: to open IRL Homekit's ports (UPnP / NAT-PMP). This stays inside your home network.
 - **Your phone and your relay VM**: the stream itself.
 
 The privacy policy for the Studio sign-ins (YouTube and Kick) is built in at `https://studio.<your-domain>/privacy`.

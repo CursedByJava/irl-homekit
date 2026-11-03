@@ -1,8 +1,9 @@
 # No port forwarding: the relay server
 
-Normally your phone connects straight to your home PC, which means forwarding ports on your router (`ROUTER.md`).
-If you can't (no access to the router, a building's Wi-Fi, a 5G home router, or an internet provider that puts you
-behind CGNAT), use a **relay**: a small free cloud server that your phone connects to instead.
+Normally your phone connects straight to your home PC: IRL Homekit opens the ports on your router by itself (or you
+forward them by hand, `ROUTER.md`), and you don't need this page. If that can't work (an internet provider that
+puts you behind carrier-grade NAT, which Setup and Status point out; a building's Wi-Fi; some 5G home routers), use
+a **relay**: a small free cloud server that your phone connects to instead. It needs a free Oracle Cloud account.
 
 ```
 Phone ──SRTLA / SRT / RTMP──▶ relay VM (public IP)  ◀══ tunnel ══  your home PC (IRL Homekit)

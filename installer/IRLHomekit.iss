@@ -592,8 +592,8 @@ begin
   NetworkPage := CreateInputOptionPage(LoginPage.ID, 'Phone connection',
     'How does your phone reach this PC when you''re out?',
     'Your phone streams to this PC over the internet, so the internet must be able to reach it.', True, False);
-  NetworkPage.Add('Router port forwarding: I can forward ports on my home router (free, fastest; steps in PHONE-SETUP.md and docs\ROUTER.md)');
-  NetworkPage.Add('No port forwarding: use a free relay server (Oracle Cloud, about 15 minutes to set up; also hides your home IP)');
+  NetworkPage.Add('Home router (recommended): IRL Homekit opens the ports on it by itself; if your router can''t, Setup says what to do');
+  NetworkPage.Add('Relay server: only if the router can''t work (e.g. some 5G home internet, Starlink). Free Oracle Cloud account, 15 minutes');
   NetworkPage.SelectedValueIndex := 0;
 
   RelayPage := CreateCustomPage(NetworkPage.ID, 'Relay server', 'Set up your free relay on Oracle Cloud, then enter its address.');
@@ -914,7 +914,7 @@ begin
   begin
     S := S + 'Phone connection:' + NewLine + Space;
     if NetworkPage.SelectedValueIndex = 1 then S := S + 'relay server ' + RelayHostEdit.Text + ' (no port forwarding)'
-    else S := S + 'router port forwarding';
+    else S := S + 'home router (ports opened automatically)';
     S := S + NewLine + 'Remote dashboard:' + NewLine + Space;
     case RemotePage.SelectedValueIndex of
       0: S := S + 'https://' + DuckNameEdit.Text + '.duckdns.org';
@@ -1085,9 +1085,19 @@ begin
     if ResultValue('relayConnected') = 'True' then S := S + ': connected' + NL
     else S := S + ': not connected yet (see below)' + NL;
   end
+  else if ResultValue('portMapOk') = 'True' then
+    S := S + NL + 'ROUTER' + NL + '  Ports opened automatically: no port forwarding needed.' + NL
   else
-    S := S + NL + 'NEXT: forward UDP 5000 and 8890 (and TCP 80/443 for the remote dashboard) on your router to this PC.' + NL +
-      '  Router steps: docs\ROUTER.md. No access to the router? Run Setup again and choose the relay server.' + NL;
+  begin
+    S := S + NL + 'ROUTER' + NL;
+    if (ResultValue('portMapProblem') = 'cgnat') or (ResultValue('portMapProblem') = 'double-nat') then
+      S := S + '  Your internet connection can''t take an incoming phone stream as it is (see the note below).' + NL +
+        '  The fix: run Setup again and choose the relay server.' + NL
+    else
+      S := S + '  NEXT: forward UDP 5000 and 8890 (and TCP 80/443 for the remote dashboard) on your router to this PC,' + NL +
+        '  or turn on UPnP in the router''s settings. Router steps: docs\ROUTER.md.' + NL +
+        '  No access to the router? Run Setup again and choose the relay server.' + NL;
+  end;
   for I := 0 to ResultLines.Count - 1 do
     if Field(ResultLines[I], 0) = 'warning' then S := S + NL + 'NOTE: ' + Field(ResultLines[I], 1) + NL;
   S := S + NL + 'Opens by itself when you sign in to Windows: ' + ResultValue('autoStart') + NL +

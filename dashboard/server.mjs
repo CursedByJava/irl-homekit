@@ -251,6 +251,16 @@ function pollServices() {
     state.services = { obs: obs.ready, mediamtx: names.has('mediamtx.exe'), 'go-irl': names.has('go-irl.exe'), noalbs: names.has('noalbs.exe') };
     if (settings.domain) state.services.caddy = names.has('caddy.exe');
     if (settings.relayHost) state.services.relay = relayUp;   // relay tunnel (docs/RELAY.md), see pollRelay
+    // Router ports IRL Homekit opens itself (UPnP / NAT-PMP, scripts/Set-IRLPortMap.ps1, renewed by the app).
+    state.portMap = null;
+    if (!settings.relayHost && settings.portMap !== 'Off') {
+      try {
+        const pm = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'portmap.json'), 'utf8').replace(/^﻿/, ''));
+        state.portMap = { ok: !!pm.ok, problem: pm.problem || '', method: pm.method || '', message: pm.message || '' };
+        // A router that doesn't do automatic ports isn't an error: ports forwarded by hand work just as well.
+        state.services.router = pm.problem === 'unsupported' ? null : !!pm.ok;
+      } catch { }
+    }
     // Programs Windows Smart App Control refused to start (written by the app, scripts/Start-IRLHomekit.ps1).
     try { state.blocked = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'blocked.json'), 'utf8')); } catch { state.blocked = []; }
   });
@@ -741,6 +751,13 @@ async function action(body) {
           { windowsHide: true }, (err) => (err ? rej(new Error('Couldn\'t restart the relay tunnel')) : res())));
         setTimeout(pollRelay, 5000);
         return { note: 'the relay tunnel reconnects within a few seconds' };
+      }
+      if (body.service === 'router') {   // ask the router again to open the ports
+        await new Promise((res) => execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(ROOT, 'scripts', 'Set-IRLPortMap.ps1'), '-Quiet'],
+          { windowsHide: true, timeout: 60000 }, () => res()));
+        pollServices();
+        let pm = {}; try { pm = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'portmap.json'), 'utf8').replace(/^﻿/, '')); } catch { }
+        return { note: pm.message || 'asked the router again' };
       }
       const exe = SERVICE_EXE[body.service]; if (!exe) throw new Error('unknown service');
       await new Promise((res) => execFile('taskkill', ['/IM', exe, '/F'], { windowsHide: true }, () => res()));

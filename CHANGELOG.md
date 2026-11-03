@@ -11,6 +11,26 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.13] - 2026-11-03
+
+### Added
+- **No port forwarding and no accounts for most people: IRL Homekit opens its ports on your router by itself.** It
+  asks the router (UPnP, or NAT-PMP on routers that use that, the way game consoles and video-call apps do) to pass
+  the phone's ports to this PC, plus 80/443 with the remote dashboard, and renews them every 20 minutes while it
+  runs. They're opened for 2 hours at a time, so they close by themselves when IRL Homekit is closed or uninstalled.
+  Ports you forwarded by hand are left alone. Setup, Status and the dashboard (*Home PC → Router ports*, with a *Try
+  again* button) show whether it worked and what to do if not: turn on UPnP or forward the ports by hand, or, when
+  the router's own internet address is a private one (carrier-grade NAT, or a second router in front of yours), use
+  the relay server, which is now only suggested to people who actually need it. Switch it off with `-PortMap Off`.
+- **One-line install:** paste `irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex`
+  into PowerShell. It downloads the newest release and starts the same installer, with no downloaded program for
+  Windows Smart App Control to block (it blocks the not-yet-signed Setup.exe on some PCs).
+
+### Changed
+- Setup's *Phone connection* page now recommends the home router (opened automatically) and keeps the relay server
+  for connections that can't take an incoming stream. The personal phone guide only lists port forwarding as a step
+  when the router couldn't open the ports itself.
+
 ## [1.0.0-beta.12] - 2026-11-03
 
 ### Added

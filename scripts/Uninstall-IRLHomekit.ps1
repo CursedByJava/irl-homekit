@@ -47,6 +47,10 @@ if (Get-Service 'WireGuardTunnel$irlhk' -ErrorAction SilentlyContinue) {
     & "$env:ProgramFiles\WireGuard\wireguard.exe" /uninstalltunnelservice irlhk
     Write-Host '  relay tunnel removed (WireGuard stays installed; remove it in Settings > Apps if you don''t use it)'
 }
+# Router ports IRL Homekit opened itself (they'd close within 2 hours anyway). Ones you forwarded by hand stay.
+if (Test-Path "$InstallDir\scripts\Set-IRLPortMap.ps1") {
+    try { $pm = & "$InstallDir\scripts\Set-IRLPortMap.ps1" -InstallDir $InstallDir -Remove -Quiet; Write-Host "  $($pm.message)" } catch { }
+}
 
 # 4. Files.
 if ($wipe) {
@@ -57,5 +61,5 @@ if ($wipe) {
 } else {
     Write-Host "  kept $InstallDir (delete it yourself whenever you like)"
 }
-Write-Host "`nIRL Homekit is uninstalled. Remember to remove the port forwards on your router (or delete the relay VM)." -ForegroundColor Green
+Write-Host "`nIRL Homekit is uninstalled. If you forwarded ports on your router by hand, remove those forwards (or delete the relay VM if you made one)." -ForegroundColor Green
 if (-not $Yes) { Read-Host 'Press Enter to close' }

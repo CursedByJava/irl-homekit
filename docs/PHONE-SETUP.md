@@ -5,7 +5,7 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
 ## 1. Finish the PC side
 
 <!-- router -->
-1. **Router port forwarding** → forward to this PC (`{{LAN_IP}}`). See `docs/ROUTER.md` in the IRL Homekit repo for router-by-router steps.
+1. **Router ports**: {{ROUTER_PORTS}}
 
    | Protocol | Port | What |
    |---|---|---|
@@ -14,7 +14,7 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
    | TCP | 1935 | Backup phone stream (RTMP), optional |
    | TCP | 443 + 80 | Remote dashboard (only if you set a domain) |
 
-   Also give this PC a **DHCP reservation** so it keeps `{{LAN_IP}}`.
+   {{ROUTER_AFTER}}
 <!-- /router -->
 <!-- relay -->
 1. **Relay server** (no router port forwarding): your phone streams to your relay at `{{RELAY_HOST}}`, and this PC

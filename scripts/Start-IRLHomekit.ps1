@@ -213,6 +213,7 @@ if (-not (Test-Path $stamp) -or (Get-Item $stamp).LastWriteTime -lt (Get-Date).A
 }
 $nextTokenCheck = Get-Date
 $nextDuck = Get-Date
+$nextPortMap = Get-Date
 $wsPort = if ($settings.obsWebsocketPort) { $settings.obsWebsocketPort } else { 4455 }
 $noWsSince = $null
 while ($true) {
@@ -238,6 +239,11 @@ while ($true) {
     if ($settings.duckdnsName -and $secrets.duckdnsToken -and (Get-Date) -ge $nextDuck) {
         $nextDuck = (Get-Date).AddMinutes(5)
         Update-DuckDns
+    }
+    # Router ports (scripts\Set-IRLPortMap.ps1): opened for 2 hours at a time, so renew them while the app runs.
+    if (-not $settings.relayHost -and "$($settings.portMap)" -ne 'Off' -and (Get-Date) -ge $nextPortMap) {
+        $nextPortMap = (Get-Date).AddMinutes(20)
+        Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$root\scripts\Set-IRLPortMap.ps1`" -Quiet"
     }
     Rotate-MediamtxLog
     Ensure 'mediamtx' "$root\mediamtx\mediamtx.exe" @("$root\mediamtx\mediamtx.yml") "$root\mediamtx"
