@@ -11,6 +11,8 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.18] - 2026-11-03
+
 ### Fixed
 - **No more grey box with black text at the top of the installer window** (the one-line install and Install IRL
   Homekit.cmd): that was Windows PowerShell's own download progress bar. It's off now, which also makes the
@@ -313,7 +315,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.17...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.18...HEAD
+[1.0.0-beta.18]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.17...v1.0.0-beta.18
 [1.0.0-beta.17]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.16...v1.0.0-beta.17
 [1.0.0-beta.16]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.15...v1.0.0-beta.16
 [1.0.0-beta.15]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.14...v1.0.0-beta.15
