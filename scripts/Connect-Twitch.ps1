@@ -20,7 +20,7 @@ param(
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 # IRL Homekit's Twitch app (dev.twitch.tv console, client type Public: no secret exists for it).
-$ClientId = ''
+$ClientId = '6xa1s84rchr523y5cwrjwcnqudsqf9'
 $Scopes = 'chat:read chat:edit channel:manage:broadcast channel:manage:clips channel:read:stream_key'
 $utf8 = New-Object Text.UTF8Encoding $false
 
@@ -102,9 +102,10 @@ function Use-TwitchAuth($a) {
         }
     }
     [IO.File]::WriteAllText("$InstallDir\secrets.json", ($s | ConvertTo-Json -Depth 10), $utf8)
-    # The dashboard reads these at start: restart it (the app's watchdog brings it back within seconds).
-    $dash = (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
-    if ($dash) { Stop-Process -Id $dash -Force -ErrorAction SilentlyContinue }
+    # The dashboard and NOALBS read these when they start, and run with administrator rights: the IRL Homekit app
+    # restarts them within seconds (scripts\Start-IRLHomekit.ps1).
+    New-Item -ItemType Directory -Force "$InstallDir\logs" | Out-Null
+    Add-Content "$InstallDir\logs\restart.request" 'noalbs dashboard'
 }
 
 if ($Apply) {

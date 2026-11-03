@@ -40,6 +40,8 @@ if ($cfg -match '"chat":\s*null') {
     $null = $cfg | ConvertFrom-Json
     [IO.File]::WriteAllText("$dir\config.json", $cfg, $utf8)
 }
-# The watchdog restarts NOALBS within ~10 seconds with the new settings.
-Get-Process -Name noalbs -ErrorAction SilentlyContinue | Stop-Process -Force
+# The IRL Homekit app restarts NOALBS within ~10 seconds with the new settings (it runs with administrator rights;
+# this window may not).
+New-Item -ItemType Directory -Force "$root\logs" | Out-Null
+Add-Content "$root\logs\restart.request" 'noalbs'
 Write-Host 'Chat commands enabled. Type !bitrate in your Twitch chat in ~15 seconds to test.'

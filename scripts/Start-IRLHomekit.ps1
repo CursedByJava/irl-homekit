@@ -246,6 +246,19 @@ while ($true) {
         Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$root\scripts\Set-IRLPortMap.ps1`" -Quiet"
     }
     Rotate-MediamtxLog
+    # Restarts asked for by tools that run without administrator rights and so can't stop these themselves
+    # (scripts\Connect-Twitch.ps1, Set-TwitchBotToken.ps1): logs\restart.request lists them. Started again just below.
+    $req = "$logs\restart.request"
+    if (Test-Path $req) {
+        $names = @(("$(Get-Content $req -Raw -ErrorAction SilentlyContinue)" -split '\s+') | Where-Object { $_ } | Select-Object -Unique)
+        Remove-Item $req -Force -ErrorAction SilentlyContinue
+        if ($names -contains 'noalbs') { Get-Process -Name noalbs -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\*" } | Stop-Process -Force -ErrorAction SilentlyContinue }
+        $d = Get-DashboardPid
+        if ($names -contains 'dashboard' -and $d -and (Get-CimInstance Win32_Process -Filter "ProcessId=$d").CommandLine -like "*$root\dashboard\server.mjs*") {
+            Stop-Process -Id $d -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
+        }
+        Log "restarting $($names -join ', ') for new settings"
+    }
     Ensure 'mediamtx' "$root\mediamtx\mediamtx.exe" @("$root\mediamtx\mediamtx.yml") "$root\mediamtx"
     Ensure 'go-irl' "$root\go-irl\go-irl.exe" @('-cli', '-mode=standalone', '-srtla-port=5000', '-udp-port=5002',
         '-ws-port=8888', '-bs-port=9999', "-passphrase=$($secrets.goirlPassphrase)") "$root\go-irl"
