@@ -269,6 +269,24 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). Questions or want to sha
 [Discussions](https://github.com/CursedByJava/irl-homekit/discussions). Found a bug? [Report it](https://github.com/CursedByJava/irl-homekit/issues/new/choose).
 Security problem? See [SECURITY.md](SECURITY.md).
 
+## Privacy
+
+IRL Homekit has no telemetry, analytics or accounts of its own, and no server of ours is involved: everything runs
+on your PC (and your relay VM, if you use one). Your settings, passwords and tokens stay in `C:\IRLHomekit`.
+It only connects to:
+
+- **GitHub** (api.github.com): to check for a newer IRL Homekit version, when the app opens (once a day) and on the
+  dashboard. Installing also downloads the tools from their official release pages (GitHub, nodejs.org,
+  download.wireguard.com for the optional relay).
+- **ipify** (api.ipify.org): to read your home's public IP address, for your phone settings and the remote-access checks.
+- **DuckDNS** (duckdns.org): only if you use a DuckDNS name, to keep it pointed at your PC or relay.
+- **Let's Encrypt**: only with the remote dashboard, for its HTTPS certificate (through Caddy).
+- **Twitch, Kick, YouTube / Google**: only for the platforms you connect in Studio, to show live status, chat and
+  titles; and TwitchTokenGenerator (twitchtokengenerator.com) to refresh the Twitch chat token if you set it up.
+- **Your phone and your relay VM**: the stream itself.
+
+The privacy policy for the Studio sign-ins (YouTube and Kick) is built in at `https://studio.<your-domain>/privacy`.
+
 ## Support the project
 
 IRL Homekit is free and always will be. If it saves you a monthly bill and you'd like to say thanks, you can chip

@@ -60,6 +60,36 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VER" installer\IRLHomekit.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      # Code signing (SignPath Foundation, free for open source), so Windows Smart App Control doesn't block Setup.exe.
+      # Runs only once the repository has the SIGNPATH_API_TOKEN secret and the SIGNPATH_ORGANIZATION_ID,
+      # SIGNPATH_PROJECT_SLUG and SIGNPATH_SIGNING_POLICY_SLUG variables; until then the unsigned Setup.exe is attached.
+      - name: Upload unsigned Setup.exe for signing
+        id: unsigned
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-unsigned
+          path: installer/Output/IRL-Homekit-Setup-${{ env.VER }}.exe
+          if-no-files-found: error
+      - name: Sign Setup.exe
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: installer/Signed
       - name: Attach it to the release
         shell: pwsh
-        run: gh release upload "v$env:VER" "installer\Output\IRL-Homekit-Setup-$env:VER.exe" --clobber
+        run: |
+          $exe = "installer\Output\IRL-Homekit-Setup-$env:VER.exe"
+          $signed = "installer\Signed\IRL-Homekit-Setup-$env:VER.exe"
+          if (Test-Path $signed) {
+            $sig = Get-AuthenticodeSignature $signed
+            if ($sig.Status -ne 'Valid') { throw "Signed Setup.exe has signature status $($sig.Status)" }
+            $exe = $signed; Write-Host "Signed by $($sig.SignerCertificate.Subject)"
+          }
+          gh release upload "v$env:VER" $exe --clobber
