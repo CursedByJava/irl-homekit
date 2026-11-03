@@ -17,6 +17,9 @@ Twitch's go-live notification text can't be changed by any outside tool; Studio 
    *Generate Token* → *Authorize* → solve the CAPTCHA.
 2. Start menu → **IRL Homekit - Twitch chat token**, and paste the Access and Refresh tokens.
 
+For **clips on BRB** (dashboard → Clips), also enable **channel:manage:clips** and authorize with your channel's own
+account: then the clips play as plain video. Without it they play in Twitch's own player, which works too.
+
 ## Kick (about 3 minutes)
 1. kick.com → **Settings → Developer → Create new**.
 2. Fill in:

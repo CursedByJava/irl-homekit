@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Clips</title>
+  <!-- Served by the dashboard (http://localhost:8090/overlay/clips), not opened as a file: it needs the clip list.
+       ?banner=0 hides the "be right back" banner, ?title=...&sub=... change its text. -->
+  <style>
+    @font-face { font-family: 'Inter'; src: url('/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+    :root { --a: #ff2d55; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; color: #fff; }
+    body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    /* Nothing shows until a clip plays: the BRB screen under this source stays visible meanwhile. */
+    .player { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .6s ease; }
+    body.playing .player { opacity: 1; }
+    .player video, .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; background: #000; }
+    .banner { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 22px;
+      padding: 20px 34px 20px 26px; border-radius: 999px; background: rgba(10,10,18,.62); backdrop-filter: blur(24px) saturate(160%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 12px 40px rgba(0,0,0,.35); opacity: 0; transition: opacity .6s ease; white-space: nowrap; }
+    body.playing .banner { opacity: 1; }
+    .banner svg { width: 56px; height: 56px; flex: none; }
+    .banner .title { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; }
+    .banner .sub { font-size: 26px; font-weight: 500; color: rgba(255,255,255,.78); display: inline-flex; align-items: center; gap: 12px; }
+    .dots { display: inline-flex; gap: 7px; }
+    .dots i { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: .3; animation: dot 1.4s ease-in-out infinite; }
+    .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+    @keyframes dot { 0%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+    .wave { animation: wave 2.4s ease-in-out infinite; } .wave.w2 { animation-delay: .3s; }
+    @keyframes wave { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+    .caption { position: absolute; left: 56px; bottom: 52px; max-width: 1200px; padding: 16px 24px; border-radius: 20px; background: rgba(10,10,18,.55);
+      backdrop-filter: blur(18px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); opacity: 0; transform: translateY(12px); transition: opacity .5s ease, transform .5s ease; }
+    body.playing .caption.show { opacity: 1; transform: none; }
+    .caption .ctitle { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .caption .cmeta { font-size: 22px; color: rgba(255,255,255,.7); margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="player" id="player"></div>
+  <div class="banner" id="banner">
+    <svg viewBox="0 0 512 512" aria-hidden="true">
+      <g fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round">
+        <path class="wave" d="M329.5 194.3 A96 96 0 0 1 329.5 317.7"/><path class="wave" d="M182.5 317.7 A96 96 0 0 1 182.5 194.3"/>
+        <path class="wave w2" d="M375.5 155.7 A156 156 0 0 1 375.5 356.3"/><path class="wave w2" d="M136.5 356.3 A156 156 0 0 1 136.5 155.7"/>
+      </g>
+      <circle cx="256" cy="256" r="38" fill="#fff"/>
+    </svg>
+    <span class="title" id="title">Be right back</span>
+    <span class="sub"><span id="sub">Signal dropped, reconnecting</span><span class="dots"><i></i><i></i><i></i></span></span>
+  </div>
+  <div class="caption" id="caption"><div class="ctitle" id="ctitle"></div><div class="cmeta" id="cmeta"></div></div>
+  <script src="/overlay/clips.js"></script>
+</body>
+</html>

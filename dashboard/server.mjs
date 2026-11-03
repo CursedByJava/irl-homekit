@@ -89,7 +89,7 @@ const extraLive = new Set();   // multi-rtmp targets IRL Homekit started for the
 
 function saveSettings() {
   const file = path.join(ROOT, 'settings.json');
-  const disk = readJson(file); disk.streamTo = settings.streamTo;   // only touch our key; the installer owns the rest
+  const disk = readJson(file); disk.streamTo = settings.streamTo; disk.clips = settings.clips;   // only touch our keys; the installer owns the rest
   fs.writeFileSync(file, JSON.stringify(disk, null, 2));
 }
 // Stream keys/servers: Twitch from the profile's main stream settings (remembered in secrets.json, since the main
@@ -145,7 +145,7 @@ async function stopExtra(p) {
   await obs.req('TriggerHotkeyByName', { hotkeyName: `obs-multi-rtmp.stop.${ep[p].id}` }).catch(() => {});
   extraLive.delete(p); log('stopped', PLATFORM_NAMES[p]);
 }
-obs.onReady = () => { applyMainOutput().catch((e) => log('main output', e.message)); };
+obs.onReady = () => { applyMainOutput().catch((e) => log('main output', e.message)); setTimeout(applyClips, 3000); };
 obs.onEvent = (type, d) => {
   if (type !== 'StreamStateChanged') return;
   if (d.outputState === 'OBS_WEBSOCKET_OUTPUT_STARTED') startExtras().catch((e) => log('extras', e.message));
@@ -407,6 +407,77 @@ function twitchChat() {
   ws.onclose = () => { tw.chat = null; setTimeout(twitchChat, 5000); };
   ws.onerror = () => {};
 }
+// ---------------------------------------------------------------- clips player (overlays/clips.html)
+// Plays your past clips on the BRB scene, under a "be right back" banner, while your connection is down (dashboard:
+// Clips card). Twitch only for now, through its official API: Get Clips lists them (any token) and, when your Twitch
+// sign-in includes the channel:manage:clips permission, Get Clips Download gives each clip's video file; without it
+// the clip plays in Twitch's official embedded player. Kick and YouTube have no clips API yet.
+const CLIP_PLATFORMS = { twitch: 'Twitch', kick: '', youtube: '' };   // '' = not possible yet
+const CLIP_PERIODS = { week: 7, month: 30, year: 365, all: 0 };
+const CLIPS_INPUT = 'IRL Clips Player';
+const CLIPS_SCENE = 'IRL BRB';
+settings.clips = { on: false, platform: 'twitch', period: 'all', ...(settings.clips || {}) };
+const clipCache = { key: '', at: 0, list: [] };
+let clipFiles = true;   // false once Twitch says the sign-in can't download clips: use the embedded player
+state.clips = { ...settings.clips, platforms: CLIP_PLATFORMS, count: null, files: null, error: '' };
+async function clipList() {
+  const { platform, period } = settings.clips;
+  if (!CLIP_PLATFORMS[platform]) throw new Error('CLIPS_UNSUPPORTED');
+  if (!tw.id || !tw.token || !tw.user) throw new Error('TWITCH_NOT_CONNECTED');
+  const key = platform + period;
+  if (clipCache.key === key && Date.now() - clipCache.at < 30 * 60e3) return clipCache.list;
+  const q = new URLSearchParams({ broadcaster_id: tw.user, first: '100' });
+  const days = CLIP_PERIODS[period] || 0;
+  if (days) { q.set('started_at', new Date(Date.now() - days * 864e5).toISOString()); q.set('ended_at', new Date().toISOString()); }
+  const list = []; let after = '';
+  for (let i = 0; i < 3; i++) {   // up to 300, most viewed first
+    const j = await helix('GET', 'clips?' + q + (after ? '&after=' + encodeURIComponent(after) : ''));
+    for (const c of j.data || []) list.push({ id: c.id, title: c.title, by: c.creator_name, views: c.view_count, duration: c.duration,
+      embed: `https://clips.twitch.tv/embed?clip=${encodeURIComponent(c.id)}&parent={parent}&autoplay=true&muted=false` });
+    after = j.pagination?.cursor; if (!after) break;
+  }
+  Object.assign(clipCache, { key, at: Date.now(), list });
+  clipFiles = true;   // try the video files again with each new list (the sign-in may have changed)
+  return list;
+}
+async function clipFile(id) {
+  if (!clipFiles || !clipCache.list.some((c) => c.id === id)) return null;
+  try {
+    const j = await helix('GET', `clips/downloads?editor_id=${tw.user}&broadcaster_id=${tw.user}&clip_id=${encodeURIComponent(id)}`);
+    const url = j.data?.[0]?.landscape_download_url || null;
+    state.clips.files = !!url; return url;
+  } catch (e) {
+    if (/Twitch 40[13]/.test(e.message)) { clipFiles = false; state.clips.files = false; log('clips: the Twitch sign-in has no clip permission; using the Twitch player'); }
+    return null;
+  }
+}
+async function refreshClips() {
+  Object.assign(state.clips, settings.clips);
+  try { state.clips.count = (await clipList()).length; state.clips.error = ''; } catch (e) { state.clips.count = null; state.clips.error = e.message; }
+}
+// The player sits just above the BRB background, so it covers that while a clip plays and the BRB screen shows
+// through when there's nothing to play. Turned off = the item is hidden, not removed.
+async function applyClips() {
+  if (!obs.ready) return;
+  try {
+    const { sceneItems } = await obs.req('GetSceneItemList', { sceneName: CLIPS_SCENE });
+    let item = sceneItems.find((i) => i.sourceName === CLIPS_INPUT);
+    if (!item && !settings.clips.on) return;
+    if (!item) {
+      const v = await obs.req('GetVideoSettings');
+      const inputSettings = { url: `http://localhost:${PORT}/overlay/clips`, width: v.baseWidth, height: v.baseHeight, fps: 30, fps_custom: true,
+        reroute_audio: true, shutdown: true, restart_when_active: true };
+      const made = await obs.req('CreateInput', { sceneName: CLIPS_SCENE, inputName: CLIPS_INPUT, inputKind: 'browser_source', inputSettings })
+        .catch(() => obs.req('CreateSceneItem', { sceneName: CLIPS_SCENE, sourceName: CLIPS_INPUT }));   // the source exists elsewhere already
+      await obs.req('SetSceneItemIndex', { sceneName: CLIPS_SCENE, sceneItemId: made.sceneItemId, sceneItemIndex: Math.min(1, sceneItems.length) });
+      item = { sceneItemId: made.sceneItemId, sceneItemEnabled: true };
+      log('clips player added to the', CLIPS_SCENE, 'scene');
+    }
+    if (item.sceneItemEnabled !== settings.clips.on) await obs.req('SetSceneItemEnabled', { sceneName: CLIPS_SCENE, sceneItemId: item.sceneItemId, sceneItemEnabled: settings.clips.on });
+  } catch (e) { log('clips player:', e.message); }
+}
+setTimeout(refreshClips, 25000); setInterval(refreshClips, 30 * 60e3);
+
 // --- Kick official API (needs the developer app's client id/secret in secrets.json, then one sign-in) ---
 const KICK_SCOPES = 'user:read channel:read channel:write chat:write events:subscribe';
 const kickRedirect = () => `https://${settings.studioDomain || settings.domain}/oauth/kick/callback`;
@@ -617,6 +688,14 @@ async function action(body) {
     case 'toggleMute':
       if (!state.inputs.some((i) => i.name === body.input)) throw new Error('unknown input');
       return obs.req('ToggleInputMute', { inputName: body.input });
+    case 'setClips': {
+      const c = settings.clips;
+      if (body.platform !== undefined) { if (!CLIP_PLATFORMS[body.platform]) throw new Error('CLIPS_UNSUPPORTED'); c.platform = body.platform; }
+      if (body.period !== undefined) { if (!(body.period in CLIP_PERIODS)) throw new Error('bad period'); c.period = body.period; }
+      if (body.on !== undefined) c.on = !!body.on;
+      saveSettings(); await refreshClips(); await applyClips();
+      return {};
+    }
     case 'refreshOverlays':
       for (const n of settings.overlayInputs || []) await obs.req('PressInputPropertiesButton', { inputName: n, propertyName: 'refreshnocache' }).catch(() => {});
       return {};
@@ -805,6 +884,8 @@ const SEC_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; img-src 'self' blob: data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cache-Control': 'no-store',
 };
+// The clips player plays Twitch's video files or its embedded player.
+const CLIPS_CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; media-src https:; frame-src https://clips.twitch.tv; img-src 'self' https: data:; connect-src 'self'; base-uri 'none'";
 function send(res, code, type, body, extra = {}) { res.writeHead(code, { 'Content-Type': type, ...SEC_HEADERS, ...extra }); res.end(body); }
 function readBody(req, limit = 4096) {
   return new Promise((resolve, reject) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > limit) { reject(new Error('too big')); req.destroy(); } }); req.on('end', () => resolve(b)); });
@@ -892,6 +973,22 @@ const server = http.createServer(async (req, res) => {
       try { await kickAfterLogin(); } catch (e) { log('kick setup after login failed', e.message); }
       pollKick();
       return back('connected');
+    }
+
+    // The clips player, for OBS on this PC: no sign-in, so only straight from this PC (Caddy, the way in from
+    // outside, always adds X-Forwarded-For). Clips are public on the platform anyway.
+    if (url.pathname.startsWith('/overlay/clips')) {
+      const local = !req.headers['x-forwarded-for'] && /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
+      if (!local) return send(res, 404, 'text/plain', 'not found');
+      const overlay = (f) => fs.readFileSync(path.join(ROOT, 'overlays', f));
+      if (url.pathname === '/overlay/clips') return send(res, 200, 'text/html; charset=utf-8', overlay('clips.html'), { 'Content-Security-Policy': CLIPS_CSP, 'X-Frame-Options': 'SAMEORIGIN' });
+      if (url.pathname === '/overlay/clips.js') return send(res, 200, 'application/javascript', overlay('clips.js'));
+      if (url.pathname === '/overlay/clips.json') {
+        try { return send(res, 200, 'application/json', JSON.stringify({ clips: await clipList() })); }
+        catch (e) { return send(res, 200, 'application/json', JSON.stringify({ clips: [], error: e.message })); }
+      }
+      if (url.pathname === '/overlay/clips/file') return send(res, 200, 'application/json', JSON.stringify({ url: await clipFile(url.searchParams.get('id') || '') }));
+      return send(res, 404, 'text/plain', 'not found');
     }
 
     if (!authed(req, res)) {

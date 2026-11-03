@@ -1,6 +1,7 @@
 # Turns on NOALBS Twitch chat commands (!bitrate, !start, !stop, !switch, !fix ...).
 # 1. Go to https://twitchtokengenerator.com, enable only chat:read + chat:edit, click Generate Token and authorize
-#    with the account that should reply in chat (your own account is fine).
+#    with the account that should reply in chat (your own account is fine). For clips on BRB (dashboard > Clips)
+#    as plain video, also enable channel:manage:clips and authorize with your channel's own account.
 # 2. Run:  powershell -ExecutionPolicy Bypass -File C:\IRLHomekit\scripts\Set-TwitchBotToken.ps1 -BotUsername <login> -Token <access token> -RefreshToken <refresh token>
 # The watchdog then refreshes the token automatically (scripts\Refresh-TwitchToken.ps1).
 #    Or just open Start menu > "IRL Homekit - Twitch chat token" and paste when asked.

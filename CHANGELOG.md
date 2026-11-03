@@ -11,6 +11,20 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Added
+- **Clips on Be Right Back.** Switch on *Play clips on BRB* on the dashboard (new *Clips* card) and, when your
+  connection drops, the BRB scene plays your past Twitch clips in random order, with a "reconnecting" banner on top
+  and the clip's title and who clipped it. Pick how far back (week, month, year, all time). It uses Twitch's
+  official API: with the *channel:manage:clips* permission on your Twitch chat token the clips play as plain video,
+  otherwise in Twitch's own player. When there's nothing to play, your usual BRB screen shows. Kick and YouTube
+  have no clips API yet, so it's Twitch only for now.
+
+### Changed
+- **Download button at the top of the README**, and the newest version is now GitHub's "Latest" release, with
+  the installer always named `IRL-Homekit-Setup.exe`, so
+  [github.com/CursedByJava/irl-homekit/releases/latest/download/IRL-Homekit-Setup.exe](https://github.com/CursedByJava/irl-homekit/releases/latest/download/IRL-Homekit-Setup.exe)
+  always downloads the newest installer. (Betas stay "Latest" until there's a stable version.)
+
 ## [1.0.0-beta.14] - 2026-11-03
 
 ### Fixed

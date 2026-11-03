@@ -48,6 +48,7 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Multistream Twitch + Kick + YouTube (+ any custom RTMP destination) without Restream, each switchable on the dashboard | [obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp) |
 | ✅ | Remote control page with live signal, preview, start/stop, scenes, mute | `dashboard/` (Node, no dependencies) |
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
+| ✅ | Your past Twitch clips on the Be Right Back scene while your connection is down, with a "reconnecting" banner on top | `overlays/clips.html`, Twitch's official clips API |
 | ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" warning (small, bottom-left) | `overlays/` (OBS browser sources) |
 | ✅ | Free HTTPS on your own domain | [Caddy](https://caddyserver.com) + Let's Encrypt |
 | ✅ | No port forwarding and no accounts for most people: IRL Homekit opens its ports on your router by itself | UPnP / NAT-PMP, `scripts/Set-IRLPortMap.ps1` |

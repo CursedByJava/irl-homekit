@@ -97,7 +97,7 @@ function dashboard() {
 
   // ---------- rendering
   function render() {
-    renderTop(); renderSignal(); renderStream(); renderScenes(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
+    renderTop(); renderSignal(); renderStream(); renderScenes(); renderClips(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
   }
 
   function renderTop() {
@@ -225,6 +225,31 @@ function dashboard() {
       return b;
     }));
   }
+
+  let clipsKey = '';
+  function renderClips() {
+    const c = s.clips; if (!c) return;
+    const key = JSON.stringify(c); if (key === clipsKey) return; clipsKey = key;
+    const t = $('clipsToggle');
+    t.classList.toggle('muted', !c.on); t.textContent = c.on ? 'On' : 'Off'; t.setAttribute('aria-pressed', String(c.on));
+    const names = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' };
+    $('clipsPlatform').replaceChildren(...Object.keys(c.platforms).map((p) => {
+      const o = el('option', '', names[p] + (c.platforms[p] ? '' : ' (no clips API yet)')); o.value = p; o.disabled = !c.platforms[p]; return o;
+    }));
+    $('clipsPlatform').value = c.platform; $('clipsPeriod').value = c.period;
+    $('clipsDesc').textContent = c.error === 'TWITCH_NOT_CONNECTED' ? 'Twitch isn\'t connected yet: on the PC, Start menu > IRL Homekit - Twitch chat token.'
+      : c.error ? 'Couldn\'t get your clips: ' + c.error
+      : c.count === null ? 'Checking…'
+      : !c.count ? 'No clips in that time range yet. Pick a longer one, or make some clips.'
+      : c.count + (c.count === 1 ? ' clip' : ' clips') + ', played in random order.' + (c.files === false ? ' Plays them in Twitch\'s player. For a cleaner look, make a new Twitch chat token with channel:manage:clips ticked too.' : '');
+  }
+  $('clipsToggle').onclick = () => {
+    const on = !s.clips.on, ready = !s.clips.error && s.clips.count;
+    act({ action: 'setClips', on }, !on ? 'Clips off.' : ready ? 'Clips will play when your connection drops.' : 'Clips on, once there are clips to play.',
+      !on ? '' : ready ? 'The Be Right Back scene now plays your clips, with the reconnecting banner on top.' : 'Until then the Be Right Back scene looks the same as before. ' + $('clipsDesc').textContent);
+  };
+  $('clipsPlatform').onchange = (e) => act({ action: 'setClips', platform: e.target.value });
+  $('clipsPeriod').onchange = (e) => act({ action: 'setClips', period: e.target.value });
 
   let audioKey = '';
   function renderAudio() {
