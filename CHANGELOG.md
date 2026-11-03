@@ -11,6 +11,8 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.16] - 2026-11-03
+
 ### Changed
 - **A phone port another device already has no longer stops your stream.** If something else on your network (a
   game console, a NAS, ...) already has UDP 5000, 8890 or TCP 1935 on the router, IRL Homekit now uses the next free
@@ -281,7 +283,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.15...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.16...HEAD
+[1.0.0-beta.16]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.15...v1.0.0-beta.16
 [1.0.0-beta.15]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.14...v1.0.0-beta.15
 [1.0.0-beta.14]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.13...v1.0.0-beta.14
 [1.0.0-beta.13]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.12...v1.0.0-beta.13
