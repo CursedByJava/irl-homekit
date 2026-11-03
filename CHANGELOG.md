@@ -30,6 +30,10 @@ is what the built-in update checker reads.
   Copy and Open buttons and how to open it on your phone; it's also on the dashboard (*Home PC*) and in *Status*.
 
 ### Changed
+- **Setup speaks plainer English** for people new to streaming setups: each page says what it's for and what to
+  pick if you're not sure; the custom destination page only shows if you tick "I also stream somewhere else"; the
+  dashboard password is made for you by default (shown at the end); the connection choices are "through my home
+  internet" (recommended) or "through a free relay server".
 - **Download button at the top of the README**, and the newest version is now GitHub's "Latest" release, with
   the installer always named `IRL-Homekit-Setup.exe`, so
   [github.com/CursedByJava/irl-homekit/releases/latest/download/IRL-Homekit-Setup.exe](https://github.com/CursedByJava/irl-homekit/releases/latest/download/IRL-Homekit-Setup.exe)

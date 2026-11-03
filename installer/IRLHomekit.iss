@@ -72,7 +72,7 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-WelcomeLabel2=This sets up IRL Homekit {#AppVersion} on this PC: your own IRL streaming server (bonded phone stream, automatic LIVE / LOW / BRB scenes, multistreaming and a phone dashboard).%n%nIt takes about 5 minutes and downloads about 400 MB. Your regular OBS is not changed.%n%nIf IRL Homekit is already installed, this updates it and keeps all your settings.
+WelcomeLabel2=This turns this PC into your own IRL streaming server, version {#AppVersion}: your phone streams to it, and it goes live on Twitch, Kick and YouTube for you, switching to a "be right back" screen by itself when your signal drops. You control it all from your phone.%n%nSetup asks a few questions (all of them can be skipped and changed later), then takes about 5 minutes. Your regular OBS is not changed.%n%nAlready have IRL Homekit? This updates it and keeps all your settings.
 FinishedHeadingLabel=IRL Homekit is ready
 ClickFinish=Click Finish to close Setup.
 
@@ -110,6 +110,7 @@ var
   CustomKeyHint: TNewStaticText;
   TwitchStatus: TNewStaticText;
   TwitchSignedIn: Boolean;
+  CustomCheck: TNewCheckBox;
   ObsPage: TWizardPage;
   CollectionCombo, ProfileCombo: TNewComboBox;
   ImportObsCheck: TNewCheckBox;
@@ -514,11 +515,11 @@ begin
     'the remote dashboard and your phone connection.' + #13#10#13#10 +
     'Make sure you are not live: IRL Homekit closes during the update and opens again when it''s done.',
     False, False);
-  UpdatePage.Add('Also change how my phone and the dashboard connect (port forwarding or relay server, remote dashboard)');
-  UpdatePage.Add('Also change my channels and stream destinations (Twitch, Kick, YouTube, custom)');
+  UpdatePage.Add('Also change how my phone and the dashboard connect (home internet or relay server, dashboard address)');
+  UpdatePage.Add('Also change where I stream, or sign in with Twitch (Twitch, Kick, YouTube, other)');
 
   // Channels: all optional. Skipped ones can be added any time by running Setup again.
-  ChannelsPage := CreateCustomPage(wpSelectDir, 'Your channels', 'All optional: skip any of them and add them later by running Setup again.');
+  ChannelsPage := CreateCustomPage(wpSelectDir, 'Where you stream', 'Fill in the ones you use. All optional: add or change them later by running Setup again.');
   Y := 0;
   NewTitle(ChannelsPage.Surface, Y, 'Twitch', ClrTwitch);
   TwitchEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
@@ -533,18 +534,25 @@ begin
   KickEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
   Hint(KickEdit, 'your Kick name');
   KickEdit.Text := InfoValue('prev', 'kickChannel');
-  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Live status and chat in Studio.');
+  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'The name in your Kick link: kick.com/yourname.');
   Y := Y + ScaleY(54);
   NewTitle(ChannelsPage.Surface, Y, 'YouTube', ClrYouTube);
   NewLink(ChannelsPage.Surface, ScaleX(70), Y, 'Find my channel', @OpenYoutube);
   YoutubeEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
   Hint(YoutubeEdit, 'channel link, @handle or ID');
   YoutubeEdit.Text := InfoValue('prev', 'youtubeChannelId');
-  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Paste the link from your browser.');
+  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Open your channel, copy the link from the address bar and paste it here.');
   Y := Y + ScaleY(58);
-  NewNote(ChannelsPage.Surface, 0, Y, ChannelsPage.SurfaceWidth,
-    'Signing in with Twitch puts your Twitch stream key in for you. Kick and YouTube keys go into the IRL Homekit OBS later; their chat and titles connect in Studio (its Connect buttons).');
-  NewLink(ChannelsPage.Surface, 0, ChannelsPage.SurfaceHeight - ScaleY(16), 'Skip for now', @SkipChannels);
+  L := NewNote(ChannelsPage.Surface, 0, Y, ChannelsPage.SurfaceWidth,
+    'Signing in with Twitch puts your Twitch stream key in for you. Kick and YouTube stream keys go in after Setup (PHONE-SETUP.md shows where).');
+  CustomCheck := TNewCheckBox.Create(ChannelsPage);
+  CustomCheck.Parent := ChannelsPage.Surface;
+  CustomCheck.Top := L.Top + L.Height + ScaleY(8);
+  CustomCheck.Width := ChannelsPage.SurfaceWidth;
+  CustomCheck.Caption := 'I also stream somewhere else (Restream, Facebook, my own server, ...)';
+  CustomCheck.Checked := InfoValue('prev', 'customServer') <> '';
+  L := NewLink(ChannelsPage.Surface, 0, ChannelsPage.SurfaceHeight - ScaleY(16), 'Skip for now', @SkipChannels);
+  L.Left := ChannelsPage.SurfaceWidth - L.Width;   // bottom right, clear of the checkbox above
 
   // Your own extra destination: any RTMP server, streamed to alongside the others.
   CustomPage := CreateCustomPage(ChannelsPage.ID, 'Custom destination', 'Optional: also stream to another service or your own server.');
@@ -570,21 +578,21 @@ begin
   NewLink(CustomPage.Surface, 0, CustomPage.SurfaceHeight - ScaleY(16), 'Skip for now', @SkipCustom);
 
   // Your regular OBS: what to start from.
-  ObsPage := CreateCustomPage(CustomPage.ID, 'Your OBS', 'IRL Homekit runs its own copy of OBS. Choose what it starts with.');
-  L := NewLabel(ObsPage, 0, 'Scenes and overlays: copy a scene collection from your regular OBS (the IRL scenes are built from it):');
+  ObsPage := CreateCustomPage(CustomPage.ID, 'Your OBS', 'IRL Homekit has its own OBS. It can start with your overlays and settings from the OBS you use now.');
+  L := NewLabel(ObsPage, 0, 'Your scenes and overlays: pick the scene collection you stream with (not sure? leave it as it is):');
   CollectionCombo := TNewComboBox.Create(ObsPage);
   CollectionCombo.Parent := ObsPage.Surface;
   CollectionCombo.Style := csDropDownList;
   CollectionCombo.Top := L.Top + L.Height + ScaleY(4);
   CollectionCombo.Width := ObsPage.SurfaceWidth;
-  CollectionCombo.Items.Add('Start empty (just the IRL scenes)');
-  L := NewLabel(ObsPage, CollectionCombo.Top + CollectionCombo.Height + ScaleY(14), 'Output and stream settings: copy a profile (includes your Twitch stream key):');
+  CollectionCombo.Items.Add('None: just IRL Homekit''s own scenes');
+  L := NewLabel(ObsPage, CollectionCombo.Top + CollectionCombo.Height + ScaleY(14), 'Your stream settings: pick your OBS profile (it includes your stream key), or keep the ready-made one:');
   ProfileCombo := TNewComboBox.Create(ObsPage);
   ProfileCombo.Parent := ObsPage.Surface;
   ProfileCombo.Style := csDropDownList;
   ProfileCombo.Top := L.Top + L.Height + ScaleY(4);
   ProfileCombo.Width := ObsPage.SurfaceWidth;
-  ProfileCombo.Items.Add('Fresh profile: 1920x1080, 60 fps, 8000 kbps');
+  ProfileCombo.Items.Add('Ready-made: 1080p, 60 fps, good for Twitch (8000 kbps)');
   for I := 0 to Info.Count - 1 do
   begin
     if Field(Info[I], 0) = 'collection' then CollectionCombo.Items.Add(Field(Info[I], 1));
@@ -600,11 +608,11 @@ begin
   NewLabel(ObsPage, ImportObsCheck.Top + ImportObsCheck.Height + ScaleY(6), 'That''s all its profiles, scene collections, settings and plugins. Your regular OBS is only read from, never changed. ' +
     'You can import from it again later: Start menu > IRL Homekit - Import from OBS.');
 
-  OverlayPage := CreateInputOptionPage(ObsPage.ID, 'Overlays', 'Which browser sources (chat, alerts, ...) should show on the IRL scenes?',
-    'Ticked sources appear on top of your phone video on the IRL LIVE / LOW scenes.', False, True);
+  OverlayPage := CreateInputOptionPage(ObsPage.ID, 'Overlays', 'Which of your overlays should show over your phone video?',
+    'These are the browser sources in your scene collection (chat box, alerts, goals, ...). Ticked ones appear on top of your phone video when you''re live.', False, True);
 
   // Dashboard login.
-  LoginPage := CreateCustomPage(OverlayPage.ID, 'Dashboard login', 'The login for your phone dashboard and Studio pages.');
+  LoginPage := CreateCustomPage(OverlayPage.ID, 'Dashboard login', 'The dashboard is the page you control your stream from on your phone. Only you should get in.');
   L := NewLabel(LoginPage, 0, 'Username:');
   LoginUser := NewEdit(LoginPage.Surface, L.Top + L.Height + ScaleY(3), ScaleX(220));
   LoginGenerate := TNewCheckBox.Create(LoginPage);
@@ -612,8 +620,9 @@ begin
   LoginGenerate.Top := LoginUser.Top + LoginUser.Height + ScaleY(14);
   LoginGenerate.Width := LoginPage.SurfaceWidth;
   LoginGenerate.Caption := 'Make a strong password for me';
+  LoginGenerate.Checked := True;   // before OnClick: the password boxes don't exist yet
   LoginGenerate.OnClick := @LoginGenerateClick;
-  L := NewLabel(LoginPage, LoginGenerate.Top + LoginGenerate.Height + ScaleY(4), 'It''s shown at the end of Setup and saved in PHONE-SETUP.md. Or choose your own (at least 10 characters):');
+  L := NewLabel(LoginPage, LoginGenerate.Top + LoginGenerate.Height + ScaleY(4), 'Setup shows it at the end and saves it in PHONE-SETUP.md, so you don''t have to remember it. Or untick this and choose your own (at least 10 characters):');
   LoginPass := NewEdit(LoginPage.Surface, L.Top + L.Height + ScaleY(3), ScaleX(220));
   LoginPass.PasswordChar := '*';
   L := NewLabel(LoginPage, LoginPass.Top + LoginPass.Height + ScaleY(8), 'Type it again:');
@@ -623,10 +632,10 @@ begin
 
   // How the phone reaches this PC.
   NetworkPage := CreateInputOptionPage(LoginPage.ID, 'Phone connection',
-    'How does your phone reach this PC when you''re out?',
-    'Your phone streams to this PC over the internet, so the internet must be able to reach it.', True, False);
-  NetworkPage.Add('Home router (recommended): IRL Homekit opens the ports on it by itself; if your router can''t, Setup says what to do');
-  NetworkPage.Add('Relay server: only if the router can''t work (e.g. some 5G home internet, Starlink). Free Oracle Cloud account, 15 minutes');
+    'How does your phone send its video to this PC when you''re out?',
+    'Not sure? Keep the first one. If it can''t work with your internet, Setup tells you at the end.', True, False);
+  NetworkPage.Add('Through my home internet (recommended, works for most homes). Nothing to set up: IRL Homekit asks your router itself');
+  NetworkPage.Add('Through a free relay server: only if Setup or the dashboard said your internet can''t take incoming streams (some 5G home internet, Starlink). About 15 minutes');
   NetworkPage.SelectedValueIndex := 0;
 
   RelayPage := CreateCustomPage(NetworkPage.ID, 'Relay server', 'Set up your free relay on Oracle Cloud, then enter its address.');
@@ -652,12 +661,12 @@ begin
   RelayHostEdit.Text := InfoValue('prev', 'relayHost');
 
   // Remote dashboard.
-  RemotePage := CreateInputOptionPage(RelayPage.ID, 'Remote dashboard',
-    'Open your dashboard from your phone anywhere?',
-    'Control the stream, scenes and chat from your phone at https://your-name..., with a free HTTPS certificate.', True, False);
-  RemotePage.Add('Yes, with a free DuckDNS name like yourname.duckdns.org (recommended, 2 minutes)');
-  RemotePage.Add('Yes, with a domain I own, like irl.yourname.com');
-  RemotePage.Add('Not now: only on this PC (set it up later: Start menu > IRL Homekit - Set up remote dashboard)');
+  RemotePage := CreateInputOptionPage(RelayPage.ID, 'Dashboard on your phone',
+    'Use the dashboard on your phone, from anywhere?',
+    'It needs a web address, like yourname.duckdns.org, that you type into your phone''s browser. You get a free one in about 2 minutes.', True, False);
+  RemotePage.Add('Yes, with a free address like yourname.duckdns.org (recommended)');
+  RemotePage.Add('Yes, with a website address I already own, like irl.yourname.com');
+  RemotePage.Add('Not now: only on this PC (add it later: Start menu > IRL Homekit - Set up remote dashboard)');
   Prev := InfoValue('prev', 'domain');
   if InfoValue('prev', 'duckdnsName') <> '' then RemotePage.SelectedValueIndex := 0
   else if Prev <> '' then RemotePage.SelectedValueIndex := 1
@@ -673,8 +682,9 @@ begin
   DuckPanel.Height := RemoteDetailPage.SurfaceHeight;
   L := TNewStaticText.Create(DuckPanel);
   L.Parent := DuckPanel; L.AutoSize := False; L.WordWrap := True; L.Width := DuckPanel.Width;
-  L.Caption := 'On duckdns.org: sign in (Google, GitHub, Reddit or X), type a name under "sub domain" and press "add domain". ' +
-    'Then click the token at the top of the page to copy it: Setup picks it up by itself.';
+  L.Caption := '1. Click Open duckdns.org and sign in there (with Google, GitHub, Reddit or X).' + #13#10 +
+    '2. Type a name under "sub domain" (it''s suggested below) and click "add domain".' + #13#10 +
+    '3. Click the long token at the top of that page to copy it. Setup fills it in by itself.';
   L.AdjustHeight;
   B := NewButton(RemoteDetailPage, 0, L.Top + L.Height + ScaleY(6), ScaleX(140), 'Open duckdns.org', @OpenDuckDns);
   B.Parent := DuckPanel;
@@ -769,7 +779,8 @@ begin
   if PageID = wpWelcome then Result := IsUpdate   // the update page says it all
   else if PageID = UpdatePage.ID then Result := not IsUpdate
   else if (PageID = wpSelectDir) or (PageID = OptionsPage.ID) then Result := IsUpdate
-  else if (PageID = ChannelsPage.ID) or (PageID = CustomPage.ID) then Result := not ChangingChannels
+  else if PageID = ChannelsPage.ID then Result := not ChangingChannels
+  else if PageID = CustomPage.ID then Result := (not ChangingChannels) or not CustomCheck.Checked
   else if PageID = ObsPage.ID then Result := IsUpdate or ((CollectionCombo.Items.Count = 1) and (ProfileCombo.Items.Count = 1))
   else if PageID = OverlayPage.ID then
   begin
@@ -855,6 +866,8 @@ begin
     end;
     KickEdit.Text := S;
     YoutubeEdit.Text := Trim(YoutubeEdit.Text);   // a link, @handle or UC... ID: the installer finds the channel
+    // Unticked "I also stream somewhere else": no custom destination (one set up before is removed).
+    if not CustomCheck.Checked then begin CustomNameEdit.Text := ''; CustomServerEdit.Text := ''; CustomKeyEdit.Text := ''; end;
   end
   else if CurPageID = CustomPage.ID then
   begin
