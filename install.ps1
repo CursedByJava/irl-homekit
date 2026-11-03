@@ -1,10 +1,11 @@
 <#
 IRL Homekit installer — turn a Windows PC into a self-hosted IRL streaming box (an IRL Toolkit alternative).
 
-Easiest: double-click "Install IRL Homekit.cmd" in the repo folder. Or, from an elevated PowerShell:
+Easiest: run IRL-Homekit-Setup.exe from the Releases page (a normal Windows setup wizard; it runs this script for
+you). Or double-click "Install IRL Homekit.cmd" in the repo folder, or from an elevated PowerShell:
     powershell -ExecutionPolicy Bypass -File .\install.ps1
 
-It asks a few questions, then:
+It asks a few questions (none with -NonInteractive, which is what Setup.exe and the updater use), then:
   1. Downloads pinned, checksum-verified releases of OBS Studio (IRL Homekit's own portable copy), go-irl,
      MediaMTX, NOALBS, obs-multi-rtmp and Caddy.
   2. Generates random passwords (secrets.json) and writes every config.
@@ -13,6 +14,10 @@ It asks a few questions, then:
   4. Adds firewall rules, stops the PC sleeping, and adds IRL Homekit to the Start menu, the desktop and
      Settings > Apps (with an uninstaller). It opens by itself when you sign in unless you pass -AutoStart Off.
   5. Writes PHONE-SETUP.md in the install folder with your personal IRL Pro settings.
+  6. With -RelayHost: connects to your relay server (a free cloud VM, docs/RELAY.md) instead of needing router
+     port forwarding.
+Secrets are never passed on the command line: Setup.exe hands them over in environment variables
+(IRLHK_DASHBOARD_PASSWORD, IRLHK_DUCKDNS_TOKEN, IRLHK_RELAY_TOKEN).
 Re-running it is safe: existing passwords, stream keys and your start-at-sign-in choice are kept.
 #>
 param(
@@ -37,12 +42,31 @@ param(
     # Free DuckDNS name to keep pointed at this PC's home IP (see docs/DOMAIN.md). Taken from -Domain when it's a duckdns.org name.
     [string] $DuckDnsName = '',
     [string] $DuckDnsToken = '',
+    # Public IP (or name) of your relay server, so your router needs no port forwarding (docs/RELAY.md). 'off' turns it off.
+    [string] $RelayHost = '',
+    # Setup.exe: write a summary of the result (key<TAB>value lines) to this file at the end.
+    [string] $ResultFile = '',
+    # Setup.exe: the wizard's answers (JSON, UTF-8), same names as these parameters. Avoids command-line quoting.
+    [string] $AnswersFile = '',
     # For testing into a sandbox: skip firewall, power, scheduled task, shortcuts, plugin install and starting things.
     [switch] $SkipSystem,
     [switch] $NonInteractive
 )
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
+if ($AnswersFile) {
+    $answers = [IO.File]::ReadAllText($AnswersFile, [Text.Encoding]::UTF8) | ConvertFrom-Json
+    foreach ($p in $answers.PSObject.Properties) {
+        if ($PSBoundParameters.ContainsKey($p.Name)) { continue }   # the command line wins
+        switch ($p.Name) {
+            { $_ -in 'ImportObs', 'NonInteractive' } { Set-Variable $p.Name ([switch][bool]$p.Value); break }
+            'OverlaySources' { $OverlaySources = @($p.Value | Where-Object { $_ }); break }
+            { $_ -in 'InstallDir', 'TwitchChannel', 'Domain', 'BaseCollection', 'BaseProfile', 'AutoStart', 'KickChannel', 'YoutubeChannelId',
+                'DashboardUser', 'DuckDnsName', 'RelayHost', 'BrbBackground' } { Set-Variable $p.Name ([string]$p.Value); break }
+            default { Write-Warning "answers file: ignoring unknown setting '$($p.Name)'" }
+        }
+    }
+}
 $Version = (Get-Content "$repo\VERSION" -Raw).Trim()
 $utf8 = New-Object Text.UTF8Encoding $false
 function Step($n, $msg) { Write-Host "`n[$n] $msg" -ForegroundColor Cyan }
@@ -57,6 +81,19 @@ function New-Secret([int]$n) {
     $c = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'.ToCharArray(); $b = New-Object byte[] $n
     [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); -join ($b | ForEach-Object { $c[$_ % $c.Length] })
 }
+# Secrets from Setup.exe (environment, so they never show up in the process list).
+if (-not $DuckDnsToken -and $env:IRLHK_DUCKDNS_TOKEN) { $DuckDnsToken = $env:IRLHK_DUCKDNS_TOKEN }
+# The relay's address as an IP (DuckDNS and DNS records need one, even if you entered a name).
+function Resolve-RelayIp($h) {
+    if (-not $h) { return '' }
+    if ($h -match '^\d{1,3}(\.\d{1,3}){3}$') { return $h }
+    try { ([Net.Dns]::GetHostAddresses($h) | Where-Object AddressFamily -eq 'InterNetwork' | Select-Object -First 1).IPAddressToString } catch { '' }
+}
+$result = [ordered]@{ ok = $false; version = ''; warnings = @() }
+# Setup.exe shows this script's output live; send it as UTF-8 so dashes and quotes come through.
+if ($ResultFile) { try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { } }
+# Windows PowerShell's download progress bar slows big downloads (OBS) down a lot when nobody is watching it.
+if ($NonInteractive -or $ResultFile) { $ProgressPreference = 'SilentlyContinue' }
 
 # Pinned downloads. Bump versions here; the installer refuses files whose SHA-256 doesn't match.
 $Downloads = @(
@@ -73,8 +110,12 @@ $Downloads = @(
     @{ Name = 'Caddy'; Url = 'https://github.com/caddyserver/caddy/releases/download/v2.11.7/caddy_2.11.7_windows_amd64.zip'
        Sha = '0a1edc0b799512051c57071ce0e798d3f2cf67dc98171366f1d2b326072e3b06'; Dir = 'caddy' }
 )
+# Only with a relay server (docs/RELAY.md). The relay VM's setup script pins the same version.
+$FrpDownload = @{ Name = 'frp (relay client)'; Url = 'https://github.com/fatedier/frp/releases/download/v0.71.1/frp_0.71.1_windows_amd64.zip'
+    Sha = 'b90074b2b6a1d792a7a40f085ac6d276bcab2d1bc60201f8a86ca53ce65ce821'; Dir = 'frp' }
 
 # ------------------------------------------------------------------ 0. checks
+$result.version = $Version
 Write-Host "IRL Homekit $Version$(if ($Version -like '*-*') { ' (beta: report problems at https://github.com/CursedByJava/irl-homekit/issues)' })" -ForegroundColor Magenta
 Step 0 'Checking this PC'
 if (-not $SkipSystem) {
@@ -90,9 +131,10 @@ if ($prev) {
     if (-not $BaseCollection) { $BaseCollection = $prev.baseCollection }
     if (-not $OverlaySources) { $OverlaySources = @($prev.overlayInputs | Where-Object { $_ }) }
     if (-not $BrbBackground) { $BrbBackground = $prev.brbBackground }
-    if (-not $prev -and -not $KickChannel) { $KickChannel = $prev.kickChannel }
-    if (-not $prev -and -not $YoutubeChannelId) { $YoutubeChannelId = $prev.youtubeChannelId }
+    if (-not $KickChannel) { $KickChannel = $prev.kickChannel }
+    if (-not $YoutubeChannelId) { $YoutubeChannelId = $prev.youtubeChannelId }
     if (-not $DuckDnsName) { $DuckDnsName = $prev.duckdnsName }
+    if (-not $RelayHost) { $RelayHost = $prev.relayHost }
     if ($prev.baseObsConfigDir -and -not $PSBoundParameters.ContainsKey('BaseObsConfigDir')) { $BaseObsConfigDir = $prev.baseObsConfigDir }
 }
 # IRL Homekit runs its own portable OBS from the install folder; your normal OBS is only read from.
@@ -167,6 +209,7 @@ if (-not $ImportObs -and ($collections -or $profiles) -and -not (Test-Path "$Ins
     $ImportObs = (Ask 'Import everything from your regular OBS? (y/N)' 'N') -match '^y'
 }
 if (-not $prev -and -not $KickChannel) { $KickChannel = Ask 'Your Kick channel name (Enter = same as Twitch, or none)' $TwitchChannel }
+if ($KickChannel -eq 'none') { $KickChannel = '' }
 if (-not $prev -and -not $YoutubeChannelId) { $YoutubeChannelId = Ask 'Your YouTube channel ID, starts with UC (Enter = skip)' }
 # Remote dashboard (reach it from your phone anywhere): the guided setup runs at the end of the install, once
 # IRL Homekit is open, so it can check DNS, router ports and the HTTPS certificate for you.
@@ -177,6 +220,8 @@ if (-not $prev -and -not $Domain -and -not $NonInteractive) {
     $setupRemote = (Ask 'Set up the remote dashboard? (Y/n)' 'Y') -notmatch '^n'
 }
 $Domain = "$Domain".Trim().ToLower()
+if ($Domain -eq 'off') { $Domain = '' }   # Setup.exe: remote dashboard switched off
+if ($DuckDnsName -eq 'off') { $DuckDnsName = '' }   # Setup.exe: no DuckDNS name any more
 $oldSecrets = if (Test-Path "$InstallDir\secrets.json") { Get-Content "$InstallDir\secrets.json" -Raw | ConvertFrom-Json }
 if (-not $DuckDnsName -and $Domain -match '([a-z0-9-]+)\.duckdns\.org$') { $DuckDnsName = $Matches[1] }
 $DuckDnsName = ($DuckDnsName -replace '\.duckdns\.org$', '').ToLower()
@@ -185,12 +230,17 @@ if ($DuckDnsName -and -not $DuckDnsToken -and -not $oldSecrets.duckdnsToken) {
 }
 # Studio sits next to the dashboard: irl.example.com -> studio.example.com. A bare DuckDNS name has no siblings
 # you control, so yourname.duckdns.org -> studio.yourname.duckdns.org (DuckDNS answers for every name under yours).
+$RelayHost = "$RelayHost".Trim().ToLower() -replace '^[a-z]+://', '' -replace '[:/].*$', ''
+if ($RelayHost -eq 'off') { $RelayHost = '' }
+if ($RelayHost -and $RelayHost -notmatch '^(\d{1,3}(\.\d{1,3}){3}|[a-z0-9-]+(\.[a-z0-9-]+)+)$') { throw "Relay server '$RelayHost' is not an IP address or host name." }
+if ($RelayHost) { $Downloads += $FrpDownload }
 $studioDomain = if (-not $Domain) { '' } elseif ($Domain -match '^[a-z0-9-]+\.duckdns\.org$') { "studio.$Domain" } else { 'studio.' + ($Domain -replace '^[^.]+\.', '') }
 # Dashboard login: asked on the first install only. Change it later with the "IRL Homekit - Change login" shortcut.
 $login = $null
 if (-not $oldSecrets.dashboardUser) {
     $defaultUser = $(if ($DashboardUser) { $DashboardUser } elseif ($TwitchChannel) { $TwitchChannel.ToLower() } else { 'admin' })
-    if ($NonInteractive) { $login = [pscustomobject]@{ Username = $defaultUser; Password = (New-Secret 16); Generated = $true } }
+    if ($NonInteractive -and $env:IRLHK_DASHBOARD_PASSWORD) { $login = [pscustomobject]@{ Username = $defaultUser; Password = $env:IRLHK_DASHBOARD_PASSWORD; Generated = $false } }
+    elseif ($NonInteractive) { $login = [pscustomobject]@{ Username = $defaultUser; Password = (New-Secret 16); Generated = $true } }
     else {
         Info 'Choose the login for your dashboard and Studio pages.'
         $login = & "$repo\scripts\Set-DashboardLogin.ps1" -AskOnly -Username $defaultUser
@@ -235,11 +285,12 @@ if (-not $SkipSystem) {
         Start-Sleep 2; Get-ChildItem "$BaseObsConfigDir\.sentinel" -Filter 'run_*' -File -ErrorAction SilentlyContinue | Remove-Item -Force
         Info 'closed the previous IRL Homekit'
     }
-    Get-Process noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process noalbs, go-irl, mediamtx, caddy, frpc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
     $dash = (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
     if ($dash) { Stop-Process -Id $dash -Force -ErrorAction SilentlyContinue }
     Start-Sleep 1
-}Step 1 'Downloading tools (checksum-verified)'
+}
+Step 1 'Downloading tools (checksum-verified)'
 New-Item -ItemType Directory -Force "$InstallDir\_downloads", "$InstallDir\logs", "$InstallDir\scripts", "$InstallDir\dashboard\public" | Out-Null
 foreach ($d in $Downloads) {
     $zip = Join-Path "$InstallDir\_downloads" (Split-Path $d.Url -Leaf)
@@ -267,6 +318,9 @@ foreach ($d in $Downloads) {
     }
     # NOALBS zips its files inside a versioned folder; flatten it.
     Get-ChildItem $dest -Directory -Filter 'noalbs-v*' | ForEach-Object { Get-ChildItem $_.FullName -Force | Move-Item -Destination $dest -Force; Remove-Item $_.FullName -Force }
+    # frp too (frp_0.71.1_windows_amd64\frpc.exe). Only the client is needed on this PC.
+    Get-ChildItem $dest -Directory -Filter 'frp_*' | ForEach-Object { Get-ChildItem $_.FullName -Force | Move-Item -Destination $dest -Force; Remove-Item $_.FullName -Recurse -Force }
+    if ($d.Dir -eq 'frp') { Remove-Item "$dest\frps.exe", "$dest\frps.toml" -Force -ErrorAction SilentlyContinue }
     Write-Utf8 $marker $d.Sha
     Info "$($d.Name): ok"
 }
@@ -274,13 +328,16 @@ foreach ($d in $Downloads) {
 # tools. Run each one once so a block is explained now, not discovered later as "not running".
 $blocked = @()
 foreach ($t in @(@('go-irl', "$InstallDir\go-irl\go-irl.exe", '-h'), @('MediaMTX', "$InstallDir\mediamtx\mediamtx.exe", '--help'),
-                 @('NOALBS', "$InstallDir\noalbs\noalbs.exe", '--help'), @('Caddy', "$InstallDir\caddy\caddy.exe", 'version'))) {
+                 @('NOALBS', "$InstallDir\noalbs\noalbs.exe", '--help'), @('Caddy', "$InstallDir\caddy\caddy.exe", 'version'),
+                 @('frp', "$InstallDir\frp\frpc.exe", '--version'))) {
+    if (-not (Test-Path $t[1])) { continue }
     try {
         $p = Start-Process $t[1] -ArgumentList $t[2] -WindowStyle Hidden -PassThru -ErrorAction Stop
         if (-not $p.WaitForExit(3000)) { $p.Kill() }
     } catch { if ("$_" -match 'Application Control|blocked') { $blocked += $t[0] } }
 }
 if ($blocked) {
+    $result.warnings += "Windows Smart App Control is blocking $($blocked -join ', '). To allow them: Windows Security > App & browser control > Smart App Control settings > Off."
     Write-Warning "Windows Smart App Control is blocking: $($blocked -join ', ')."
     Info 'These are the open-source tools IRL Homekit runs (they are not signed with a paid certificate). Until they are'
     Info 'allowed, the phone connection and auto-switching will not work. To allow them: Windows Security >'
@@ -311,8 +368,14 @@ foreach ($k in @{ goirlPassphrase = 20; mediamtxPass = 16; obsWebsocketPassword 
     if (-not $s.($k.Key)) { $s | Add-Member -Force $k.Key (New-Secret $k.Value) }
 }
 if (-not $s.mediamtxUser) { $s | Add-Member -Force mediamtxUser 'irl' }
+# OBS's own login for reading the backup feed (behind a relay, outside connections also come from 127.0.0.1).
+if (-not $s.mediamtxReadUser) { $s | Add-Member -Force mediamtxReadUser 'obs' }
+if (-not $s.mediamtxReadPass) { $s | Add-Member -Force mediamtxReadPass (New-Secret 16) }
 if ($login) { $s | Add-Member -Force dashboardUser $login.Username; $s | Add-Member -Force dashboardPassword $login.Password }
 if ($DuckDnsToken) { $s | Add-Member -Force duckdnsToken $DuckDnsToken.Trim() }
+# Relay password: the same one must be in the relay VM's setup script (Setup.exe makes it before you create the VM).
+if ($env:IRLHK_RELAY_TOKEN -and $env:IRLHK_RELAY_TOKEN -match '^[A-Za-z0-9]{24,64}$') { $s | Add-Member -Force relayToken $env:IRLHK_RELAY_TOKEN }
+if ($RelayHost -and -not $s.relayToken) { $s | Add-Member -Force relayToken (New-Secret 32) }
 $lan = (Get-NetIPConfiguration | Where-Object IPv4DefaultGateway | Select-Object -First 1).IPv4Address.IPAddress
 $public = try { (Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 10).Trim() } catch { '' }
 $s | Add-Member -Force lanIp $lan; $s | Add-Member -Force publicIp $public
@@ -327,7 +390,7 @@ $settings = [ordered]@{
     obsDir = $ObsDir; obsConfigDir = $ObsConfigDir; baseObsConfigDir = $BaseObsConfigDir; obsWebsocketPort = $ObsWsPort; obsProfile = $ObsName; obsCollection = $ObsName; domain = $Domain; twitchChannel = $TwitchChannel.ToLower()
     phoneInputs = @('IRL Phone (Bonded)', 'IRL Phone (Backup)'); overlayInputs = @($OverlaySources); audioInputs = $audio
     autoScenes = @('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)')
-    studioDomain = $studioDomain; duckdnsName = $DuckDnsName; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
+    studioDomain = $studioDomain; duckdnsName = $DuckDnsName; relayHost = $RelayHost; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
     streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true } })   # dashboard's "Stream to" switches
 }
 Write-Utf8 "$InstallDir\settings.json" ($settings | ConvertTo-Json -Depth 5)
@@ -348,12 +411,18 @@ authInternalUsers:
     permissions:
       - action: publish
         path: live
-  # OBS and NOALBS on this PC read the stream and the API without a password.
+  # OBS reads the stream with its own login (with a relay server, outside connections also come from 127.0.0.1).
+  - user: $($s.mediamtxReadUser)
+    pass: $($s.mediamtxReadPass)
+    ips: []
+    permissions:
+      - action: read
+        path: live
+  # NOALBS and the dashboard on this PC use the API (bound to 127.0.0.1, never relayed) without a password.
   - user: any
     pass:
     ips: ["127.0.0.1", "::1"]
     permissions:
-      - action: read
       - action: api
       - action: metrics
 
@@ -482,20 +551,58 @@ if (-not (Test-Path $mrDll) -or (Get-FileHash $mrDll).Hash -ne (Get-FileHash $mr
 Copy-Item "$InstallDir\_downloads\multi-rtmp\data\obs-plugins\obs-multi-rtmp\*" "$InstallDir\obs\data\obs-plugins\obs-multi-rtmp\" -Recurse -Force
 Info 'obs-multi-rtmp plugin installed'
 
-# ------------------------------------------------------------------ 6. dashboard + Caddy
-Step 6 'Setting up the remote dashboard'
+# ------------------------------------------------------------------ 6. relay, dashboard + Caddy
+Step 6 'Setting up the relay and the remote dashboard'
+$relayIp = Resolve-RelayIp $RelayHost
+New-Item -ItemType Directory -Force "$InstallDir\relay" | Out-Null
+if ($RelayHost) {
+    # The VM's setup script (same token), kept here in case you need to set up the VM again.
+    $vps = [IO.File]::ReadAllText("$repo\templates\relay-vps.sh").Replace("`r`n", "`n").Replace('{{RELAY_TOKEN}}', $s.relayToken).Replace('{{VERSION}}', $Version)
+    Write-Utf8 "$InstallDir\relay\relay-vps.sh" $vps
+    # frpc: this PC dials out to the relay over QUIC (UDP 7000) and the relay passes these ports back down.
+    # 80/443 always, so turning on the remote dashboard later (Setup-RemoteDashboard.ps1) needs no relay change.
+    $proxies = @(@('srtla', 'udp', 5000), @('srt', 'udp', 8890), @('rtmp', 'tcp', 1935), @('http', 'tcp', 80), @('https', 'tcp', 443))
+    $toml = @"
+# IRL Homekit relay client (frp). Written by the installer; re-run Setup to change it.
+serverAddr = "$RelayHost"
+serverPort = 7000
+loginFailExit = false
+auth.method = "token"
+auth.token = "$($s.relayToken)"
+transport.protocol = "quic"
+log.to = "console"
+log.level = "info"
+
+"@
+    foreach ($p in $proxies) {
+        $toml += "[[proxies]]`nname = `"irlhk-$($p[0])`"`ntype = `"$($p[1])`"`nlocalIP = `"127.0.0.1`"`nlocalPort = $($p[2])`nremotePort = $($p[2])`n"
+        # The web server sees the visitor's real address (sign-in lockouts are per visitor), via the PROXY protocol.
+        if ($p[1] -eq 'tcp' -and $p[2] -in 80, 443) { $toml += "transport.proxyProtocolVersion = `"v2`"`n" }
+        $toml += "`n"
+    }
+    Write-Utf8 "$InstallDir\relay\frpc.toml" $toml
+    Info "relay: phone and dashboard traffic arrives through $RelayHost (no router port forwarding needed)"
+    if (-not $relayIp) { $result.warnings += "Couldn't look up the relay server '$RelayHost'. Check the address."; Write-Warning "Couldn't look up '$RelayHost'." }
+} else {
+    Remove-Item "$InstallDir\relay\frpc.toml" -Force -ErrorAction SilentlyContinue
+}
+# Behind the relay every connection comes from frpc on this PC, carrying the visitor's address in a PROXY header.
+$caddyServers = if ($RelayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 127.0.0.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
 & "$InstallDir\scripts\Set-DashboardLogin.ps1" -InstallDir $InstallDir -Username $s.dashboardUser -Password $s.dashboardPassword -Quiet
 Info "dashboard login: user $($s.dashboardUser)"
 if ($Domain) {
-    Write-Utf8 "$InstallDir\caddy\Caddyfile" ([IO.File]::ReadAllText("$repo\templates\Caddyfile").Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$Domain, $studioDomain"))
+    Write-Utf8 "$InstallDir\caddy\Caddyfile" ([IO.File]::ReadAllText("$repo\templates\Caddyfile").Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$Domain, $studioDomain").Replace('{{SERVERS}}', $caddyServers))
     if ($DuckDnsName -and $s.duckdnsToken) {
         # Point the DuckDNS name at this PC now, so the HTTPS certificate can be issued on first start.
-        $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$DuckDnsName&token=$($s.duckdnsToken)" -TimeoutSec 15 } catch { "error: $($_.Exception.Message)" }
-        if ($r -eq 'OK') { Info "DuckDNS: $DuckDnsName.duckdns.org now points at this PC (kept up to date every 5 minutes)" }
-        else { Write-Warning "DuckDNS update failed ($r). Check the token and name at duckdns.org, then re-run with -DuckDnsToken." }
-        Info "HTTPS dashboard: https://$Domain and Studio: https://$studioDomain (needs router ports 80/443)"
+        # With a relay, the name points at the relay (that's where phones and browsers connect), not at this PC.
+        $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$DuckDnsName&token=$($s.duckdnsToken)$(if ($relayIp) { "&ip=$relayIp" })" -TimeoutSec 15 } catch { "error: $($_.Exception.Message)" }
+        if ($r -eq 'OK') { Info "DuckDNS: $DuckDnsName.duckdns.org now points at $(if ($relayIp) { "your relay ($relayIp)" } else { 'this PC' }) (kept up to date every 5 minutes)" }
+        else { $result.warnings += "DuckDNS refused the name and token ($r). Check both at duckdns.org, then run Setup again."; Write-Warning "DuckDNS update failed ($r). Check the token and name at duckdns.org, then re-run with -DuckDnsToken." }
+        Info "HTTPS dashboard: https://$Domain and Studio: https://$studioDomain ($(if ($RelayHost) { 'through your relay' } else { 'needs router ports 80/443' }))"
     } else {
-        Info "HTTPS dashboard: https://$Domain and Studio: https://$studioDomain (needs DNS records for both -> $public and router ports 80/443, see docs\DOMAIN.md)"
+        $target = if ($relayIp) { "$relayIp (your relay)" } else { $public }
+        Info "HTTPS dashboard: https://$Domain and Studio: https://$studioDomain (needs DNS records for both -> $target$(if (-not $RelayHost) { ' and router ports 80/443' }), see docs\DOMAIN.md)"
+        $result.warnings += "Point DNS records for $Domain and $studioDomain at $target (docs\DOMAIN.md)."
     }
 } else {
     Remove-Item "$InstallDir\caddy\Caddyfile" -ErrorAction SilentlyContinue
@@ -546,12 +653,35 @@ $dash = if ($Domain) { "https://$Domain" } else { 'http://localhost:8090 (on thi
 foreach ($kv in ([ordered]@{ '{{PUBLIC_IP}}' = $(if ($public) { $public } else { '<your public IP>' }); '{{LAN_IP}}' = $lan; '{{GOIRL_PASSPHRASE}}' = $s.goirlPassphrase
     '{{MEDIAMTX_USER}}' = $s.mediamtxUser; '{{MEDIAMTX_PASS}}' = $s.mediamtxPass; '{{DASHBOARD_URL}}' = $dash; '{{DASHBOARD_USER}}' = $s.dashboardUser
     '{{STUDIO_URL}}' = $(if ($Domain) { "https://$studioDomain" } else { 'http://localhost:8090/studio (on this PC only)' })
-    '{{PHONE_HOST}}' = $(if ($DuckDnsName -and $s.duckdnsToken) { "$DuckDnsName.duckdns.org" } elseif ($public) { $public } else { '<your public IP>' })
+    '{{PHONE_HOST}}' = $(if ($DuckDnsName -and $s.duckdnsToken) { "$DuckDnsName.duckdns.org" } elseif ($RelayHost) { $RelayHost } elseif ($public) { $public } else { '<your public IP>' })
+    '{{RELAY_HOST}}' = $RelayHost
     '{{DASHBOARD_PASS}}' = $s.dashboardPassword; '{{INSTALL_DIR}}' = $InstallDir }).GetEnumerator()) { $guide = $guide.Replace($kv.Key, $kv.Value) }
+# Keep the router or the relay instructions, whichever applies.
+$drop = if ($RelayHost) { 'router' } else { 'relay' }
+$guide = [regex]::Replace($guide, "(?s)<!-- $drop -->.*?<!-- /$drop -->\r?\n?", '')
+$guide = [regex]::Replace($guide, '<!-- /?(router|relay) -->\r?\n?', '')
 Write-Utf8 "$InstallDir\PHONE-SETUP.md" $guide
 
+$relayOk = $null
 if (-not $SkipSystem) {
     Start-ScheduledTask -TaskName 'IRL Homekit'
+    if ($RelayHost) {
+        # IRL Homekit starts the relay client a few seconds after it opens; wait for it to sign in to the relay.
+        Step 9 "Connecting to your relay ($RelayHost)"
+        $log = "$InstallDir\logs\frpc.out.log"; $deadline = (Get-Date).AddSeconds(75); $relayOk = $false
+        while ((Get-Date) -lt $deadline) {
+            $tail = Get-Content $log -Tail 40 -ErrorAction SilentlyContinue
+            if ($tail -match 'login to server success') { $relayOk = $true; break }
+            Start-Sleep 3
+        }
+        if ($relayOk) { Info 'connected to the relay' }
+        else {
+            $why = ($tail | Where-Object { $_ -match '\[E\]|\[W\]' } | Select-Object -Last 1)
+            $msg = "Couldn't connect to the relay at $RelayHost yet. Check the VM is running, its setup script finished, and Oracle's security list opens UDP and TCP 7000 (docs\RELAY.md)."
+            if ($why) { $msg += " Last message: $($why -replace '^.*\[[EW]\] (\[[^\]]*\] )?', '')" }
+            $result.warnings += $msg; Write-Warning $msg
+        }
+    }
     if ($setupRemote) { Step 9 'Remote dashboard'; & "$InstallDir\scripts\Setup-RemoteDashboard.ps1" -InstallDir $InstallDir }
 }
 
@@ -564,6 +694,17 @@ if ($Domain) { Write-Host "    Studio     https://$studioDomain" }
 Write-Host "    Username   $($s.dashboardUser)"
 Write-Host "    Password   $(if ($login -and $login.Generated) { $s.dashboardPassword } elseif ($login) { '(the one you chose)' } else { '(unchanged)' })"
 Write-Host "    Change it any time: Start menu > IRL Homekit - Change login."
-Write-Host "`nYour phone settings, passwords and the remaining steps (router port forwarding, auto sign-in) are in:"
+Write-Host "`nYour phone settings, passwords and the remaining steps ($(if ($RelayHost) { 'relay' } else { 'router port forwarding' }), auto sign-in) are in:"
 Write-Host "    $InstallDir\PHONE-SETUP.md" -ForegroundColor Yellow
+if ($ResultFile) {
+    $result.ok = $true
+    $result.installDir = $InstallDir; $result.guide = "$InstallDir\PHONE-SETUP.md"; $result.autoStart = $AutoStart
+    $result.dashboardUrl = $dash; $result.studioUrl = $(if ($Domain) { "https://$studioDomain" } else { '' })
+    $result.username = $s.dashboardUser
+    $result.password = $(if ($login -and $login.Generated) { $s.dashboardPassword } else { '' })   # only one we made up
+    $result.relayHost = $RelayHost; $result.relayConnected = $relayOk
+    # key<TAB>value lines (UTF-8 with BOM), easy for Setup.exe to read; one "warning" line per warning.
+    $out = foreach ($k in $result.Keys) { if ($k -eq 'warnings') { foreach ($w in $result.warnings) { "warning`t$w" } } else { "$k`t$($result[$k])" } }
+    [IO.File]::WriteAllLines($ResultFile, [string[]]$out, (New-Object Text.UTF8Encoding $true))
+}
 Write-Host "`nEnjoying IRL Homekit? It's free; if you'd like to chip in: https://github.com/CursedByJava/irl-homekit#support-the-project" -ForegroundColor DarkGray

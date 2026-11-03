@@ -14,10 +14,29 @@ is what the built-in update checker reads.
 ## [1.0.0-beta.12] - 2026-11-02
 
 ### Added
+- **Setup.exe: a real Windows setup wizard.** Download `IRL-Homekit-Setup-<version>.exe` from the release and click
+  through it instead of answering questions in a console window: your channels, which OBS scene collection, profile
+  and overlays to bring over (picked from lists), a dashboard login, how your phone reaches the PC, the remote
+  dashboard, and start with Windows. It then installs with a progress bar and the live log, and ends with your
+  dashboard address, login and next steps. Running it again updates IRL Homekit and keeps your settings (tick a box to
+  change the phone connection or remote dashboard). Built by the release workflow and attached to every release; the
+  `.cmd` installer and the built-in updater keep working as before.
+- **No port forwarding needed (optional relay server).** If you can't forward ports on your router (or your provider
+  uses CGNAT), Setup can set you up with a free relay on Oracle Cloud's Always Free tier: it gives you a script to paste
+  when you create the VM, and you enter the VM's address. Your phone then streams to the relay and your PC connects out
+  to it, so the router needs nothing, and your home IP stays private. Uses [frp](https://github.com/fatedier/frp)
+  (pinned, checksum-verified) on both ends; the remote dashboard works through it too, with HTTPS. The phone guide,
+  Phone settings, Status, the dashboard's Home PC checks and DuckDNS all follow the relay. Step by step:
+  [docs/RELAY.md](docs/RELAY.md).
 - **Phone settings on the dashboard.** A new card shows everything to enter in IRL Pro (bonded SRTLA server and
   passphrase, backup SRT server and stream ID, RTMP), each with a Copy button, so you can set up or fix the phone from
   anywhere instead of only from `PHONE-SETUP.md` on the PC. It stays hidden until you tap Show (it holds your stream
   passwords; keep it off camera) and hides itself again after 2 minutes. Only signed-in devices can load it.
+
+### Changed
+- OBS now reads the backup phone feed from MediaMTX with its own password instead of being trusted for coming from
+  this PC. Behind a relay server every outside connection also arrives from this PC, so this keeps the feed private.
+  Applied automatically by the update (the IRL scenes are rebuilt as usual).
 
 ### Fixed
 - Status always showed the IP address from install in the IRL Pro settings, even with a DuckDNS name, and kept showing

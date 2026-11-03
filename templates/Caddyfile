@@ -2,6 +2,8 @@
 	# Certificates and Caddy state live next to the binary so everything stays in the install folder.
 	storage file_system {{INSTALL_DIR}}/caddy/data
 	admin 127.0.0.1:2019
+	# Relay mode (docs/RELAY.md) puts a PROXY-protocol listener here; empty otherwise.
+	{{SERVERS}}
 	log {
 		output file {{INSTALL_DIR}}/logs/caddy.log {
 			roll_size 10MiB

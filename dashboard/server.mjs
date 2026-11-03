@@ -246,6 +246,7 @@ function pollServices() {
     // OBS: your normal OBS may be open too, so "running" means IRL Homekit's own OBS answering on its WebSocket.
     state.services = { obs: obs.ready, mediamtx: names.has('mediamtx.exe'), 'go-irl': names.has('go-irl.exe'), noalbs: names.has('noalbs.exe') };
     if (settings.domain) state.services.caddy = names.has('caddy.exe');
+    if (settings.relayHost) state.services.frpc = names.has('frpc.exe');   // relay client (docs/RELAY.md)
     // Programs Windows Smart App Control refused to start (written by the app, scripts/Start-IRLHomekit.ps1).
     try { state.blocked = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'blocked.json'), 'utf8')); } catch { state.blocked = []; }
   });
@@ -325,14 +326,18 @@ async function checkRemote() {
   const names = [settings.domain, settings.studioDomain].filter(Boolean);
   const r = { domain: settings.domain, studio: settings.studioDomain, ok: true, problem: '' };
   try {
-    const ip = (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(8000) })).text()).trim();
+    // Names must point at the relay server when there is one (docs/RELAY.md), else at this PC's home IP.
+    const ip = settings.relayHost ? await relayIp() : (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(8000) })).text()).trim();
+    const where = settings.relayHost ? 'your relay' : 'your home IP';
     const resolver = new dns.Resolver(); resolver.setServers(['1.1.1.1', '8.8.8.8']);
     for (const n of names) {
       const got = await resolver.resolve4(n).catch(() => []);
-      if (!got.includes(ip)) { r.ok = false; r.problem = got.length ? `${n} points to ${got[0]}, but your home IP is ${ip}. Update its DNS record.` : `${n} has no DNS record.`; break; }
+      if (!got.includes(ip)) { r.ok = false; r.problem = got.length ? `${n} points to ${got[0]}, but ${where} is ${ip}. Update its DNS record.` : `${n} has no DNS record.`; break; }
     }
     const certDir = path.join(ROOT, 'caddy', 'data', 'certificates', 'acme-v02.api.letsencrypt.org-directory');
-    if (r.ok) for (const n of names) if (!fs.existsSync(path.join(certDir, n, `${n}.crt`))) { r.ok = false; r.problem = `No HTTPS certificate for ${n} yet: usually the router isn't forwarding ports 80 and 443.`; break; }
+    if (r.ok) for (const n of names) if (!fs.existsSync(path.join(certDir, n, `${n}.crt`))) {
+      r.ok = false; r.problem = `No HTTPS certificate for ${n} yet: usually ${settings.relayHost ? "the relay VM doesn't let ports 80 and 443 in" : "the router isn't forwarding ports 80 and 443"}.`; break;
+    }
   } catch (e) { r.ok = null; r.problem = 'Could not check (no internet?)'; }
   state.remote = r;
 }
@@ -577,7 +582,7 @@ fs.watchFile(CONFIG_FILE, { interval: 2000 }, () => {
 });
 
 // ---------------------------------------------------------------- actions
-const SERVICE_EXE = { 'go-irl': 'go-irl.exe', mediamtx: 'mediamtx.exe', noalbs: 'noalbs.exe', caddy: 'caddy.exe' };
+const SERVICE_EXE = { 'go-irl': 'go-irl.exe', mediamtx: 'mediamtx.exe', noalbs: 'noalbs.exe', caddy: 'caddy.exe', frpc: 'frpc.exe' };
 async function action(body) {
   switch (body.action) {
     case 'startStream': return obs.req('StartStream');
@@ -727,21 +732,29 @@ async function action(body) {
   }
 }
 
+async function relayIp() {
+  const h = settings.relayHost || '';
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return h;
+  const resolver = new dns.Resolver(); resolver.setServers(['1.1.1.1', '8.8.8.8']);
+  return (await resolver.resolve4(h).catch(() => []))[0] || '';
+}
+
 // ---------------------------------------------------------------- phone settings (what to type into IRL Pro)
-// Same address the personal phone guide uses: the DuckDNS name if there is one (it follows the home IP), else the
-// home IP as it is right now. Read from disk on every request: the remote-dashboard setup can add DuckDNS later.
+// Same address the personal phone guide uses: the DuckDNS name if there is one (it follows the home IP, or the
+// relay), else the relay server if there is one (docs/RELAY.md), else the home IP as it is right now. Read from disk on every request: the remote-dashboard setup can add DuckDNS later.
 // Only sent on request (never in the live /events stream), because it holds the stream passwords.
 async function phoneSettings() {
   const sec = readJson(`${ROOT}/secrets.json`), set = readJson(`${ROOT}/settings.json`);
   const duck = set.duckdnsName && sec.duckdnsToken ? `${set.duckdnsName}.duckdns.org` : '';
+  const relay = set.relayHost || '';
   let ip = '';
-  if (!duck) { try { ip = (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(5000) })).text()).trim(); } catch { } }
+  if (!duck && !relay) { try { ip = (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(5000) })).text()).trim(); } catch { } }
   if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) ip = '';
-  const host = duck || ip || sec.publicIp || '';
+  const host = duck || relay || ip || sec.publicIp || '';
   const user = sec.mediamtxUser || 'irl', pass = sec.mediamtxPass || '', phrase = sec.goirlPassphrase || '';
   return {
-    host, duckdns: !!duck,
-    ipChanged: !duck && !!ip && !!sec.publicIp && ip !== sec.publicIp, installIp: sec.publicIp || '',
+    host, duckdns: !!duck, relay: !!relay,
+    ipChanged: !duck && !relay && !!ip && !!sec.publicIp && ip !== sec.publicIp, installIp: sec.publicIp || '',
     bonded: { server: `srtla://${host}:5000`, passphrase: phrase, combined: `srtla://${host}:5000?passphrase=${phrase}` },
     srt: { server: `srt://${host}:8890`, streamId: `publish:live:${user}:${pass}` },
     rtmp: { url: `rtmp://${host}:1935/live?user=${user}&pass=${pass}` },

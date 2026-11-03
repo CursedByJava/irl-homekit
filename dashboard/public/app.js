@@ -22,6 +22,7 @@ function dashboard() {
     mediamtx: ['Backup receiver (MediaMTX)', 'Receives the backup SRT/RTMP connection.'],
     noalbs: ['Auto-switcher (NOALBS)', 'Switches LIVE / LOW / BRB scenes based on your signal.'],
     caddy: ['Web server (Caddy)', 'Serves this page securely over HTTPS from your home PC.'],
+    frpc: ['Relay connection (frp)', 'Connects this PC to your relay server, which receives the phone stream (no router port forwarding).'],
   };
   let s = null; let lastMsg = 0; let busy = false;
 
@@ -290,6 +291,7 @@ function dashboard() {
           const what = {
             noalbs: 'Auto-switching pauses for about 10 seconds. Your stream keeps running.',
             caddy: 'This page disconnects for about 10 seconds, then reconnects by itself. Your stream keeps running.',
+            frpc: 'The phone and this page lose the relay for about 10 seconds. Viewers may see the Be Right Back scene briefly.',
           }[k] || 'If your phone is sending through it, viewers see the Be Right Back scene for about 10–15 seconds.';
           const yes = await confirmBox('Restart ' + title + '?', what, 'Restart', 'Keep running');
           if (yes) act({ action: 'restartService', service: k }, title + ' is restarting.', 'It comes back within about 10 seconds.');

@@ -181,7 +181,7 @@ function Test-ObsCrashed {
 function Stop-Everything {
     Log 'IRL Homekit OBS was closed; stopping everything'
     # Only this install's copies.
-    Get-Process -Name noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\*" } |
+    Get-Process -Name noalbs, go-irl, mediamtx, caddy, frpc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\*" } |
         Stop-Process -Force -ErrorAction SilentlyContinue
     $d = Get-DashboardPid
     if ($d -and (Get-CimInstance Win32_Process -Filter "ProcessId=$d").CommandLine -like "*$root\dashboard\server.mjs*") {
@@ -189,10 +189,17 @@ function Stop-Everything {
     }
 }
 
-# Free DuckDNS name (docs/DOMAIN.md): point it at this PC's current home IP. Logged only when the answer changes.
+# Free DuckDNS name (docs/DOMAIN.md): point it at this PC's current home IP, or at the relay server when there is one
+# (docs/RELAY.md: phones and browsers connect to the relay). Logged only when the answer changes.
 $lastDuck = ''
+function Get-RelayIp {
+    $h = $settings.relayHost; if (-not $h) { return '' }
+    if ($h -match '^\d{1,3}(\.\d{1,3}){3}$') { return $h }
+    try { ([Net.Dns]::GetHostAddresses($h) | Where-Object AddressFamily -eq 'InterNetwork' | Select-Object -First 1).IPAddressToString } catch { '' }
+}
 function Update-DuckDns {
-    $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$($settings.duckdnsName)&token=$($secrets.duckdnsToken)" -TimeoutSec 10 } catch { "error: $($_.Exception.Message)" }
+    $ipArg = if ($settings.relayHost) { $rip = Get-RelayIp; if (-not $rip) { return }; "&ip=$rip" } else { '' }
+    $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$($settings.duckdnsName)&token=$($secrets.duckdnsToken)$ipArg" -TimeoutSec 10 } catch { "error: $($_.Exception.Message)" }
     if ($r -ne $script:lastDuck) { Log "DuckDNS update for $($settings.duckdnsName).duckdns.org: $r"; $script:lastDuck = $r }
 }
 
@@ -240,6 +247,10 @@ while ($true) {
     Ensure-Dashboard
     if (Test-Path "$root\caddy\Caddyfile") {
         Ensure 'caddy' "$root\caddy\caddy.exe" @('run', '--config', "$root\caddy\Caddyfile", '--adapter', 'caddyfile') "$root\caddy"
+    }
+    # Relay server (docs/RELAY.md): this PC dials out to it, so the router needs no port forwarding.
+    if ($settings.relayHost -and (Test-Path "$root\relay\frpc.toml")) {
+        Ensure 'frpc' "$root\frp\frpc.exe" @('-c', "$root\relay\frpc.toml") "$root\frp"
     }
   } catch {
     # Never let one bad check stop the watchdog; log it and keep going.

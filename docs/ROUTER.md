@@ -1,6 +1,7 @@
 # Router setup
 
 Your phone connects to your home PC over the internet, so your router must pass these ports to the PC.
+Can't change router settings, or your provider uses CGNAT? Use a free relay server instead: [RELAY.md](RELAY.md).
 
 | Protocol | Port | Needed for |
 |---|---|---|

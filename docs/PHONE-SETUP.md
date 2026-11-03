@@ -4,6 +4,7 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
 
 ## 1. Finish the PC side
 
+<!-- router -->
 1. **Router port forwarding** → forward to this PC (`{{LAN_IP}}`). See `docs/ROUTER.md` in the IRL Homekit repo for router-by-router steps.
 
    | Protocol | Port | What |
@@ -14,6 +15,14 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
    | TCP | 443 + 80 | Remote dashboard (only if you set a domain) |
 
    Also give this PC a **DHCP reservation** so it keeps `{{LAN_IP}}`.
+<!-- /router -->
+<!-- relay -->
+1. **Relay server** (no router port forwarding): your phone streams to your relay at `{{RELAY_HOST}}`, and this PC
+   connects out to it. Keep the relay VM running; IRL Homekit reconnects to it by itself. If the phone can't connect,
+   check the relay: `docs/RELAY.md` in the IRL Homekit repo (Oracle security list: UDP 5000, 8890, 7000; TCP 1935,
+   7000, 80, 443). The VM's setup script, in case you need to set it up again: `{{INSTALL_DIR}}\relay\relay-vps.sh`
+   (it contains your relay password: keep it private).
+<!-- /relay -->
 2. **Automatic sign-in** (optional) so IRL Homekit comes back by itself after a reboot or power cut (it opens when you sign in): Win+R → `netplwiz` → untick
    *"Users must enter a user name and password"* (if the box is missing, first turn off *Settings → Accounts →
    Sign-in options → "only allow Windows Hello sign-in"*).

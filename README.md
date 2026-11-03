@@ -43,6 +43,8 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
 | ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" warning (small, bottom-left) | `overlays/` (OBS browser sources) |
 | ✅ | Free HTTPS on your own domain | [Caddy](https://caddyserver.com) + Let's Encrypt |
+| ✅ | No port forwarding needed (optional): a free relay server in front of your PC, also hides your home IP | [frp](https://github.com/fatedier/frp) on Oracle Cloud Always Free, see [RELAY.md](docs/RELAY.md) |
+| ✅ | A normal Windows setup wizard | `installer/` ([Inno Setup](https://jrsoftware.org/isinfo.php)) |
 | ✅ | Starts with Windows (optional), restarts anything that crashes | `scripts/Start-IRLHomekit.ps1` |
 
 Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Support the project](#support-the-project).
@@ -53,7 +55,8 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Sup
   IRL Homekit brings its own copy. If you already use OBS, the installer can copy your scenes and settings from it.
 - Windows 11 *Smart App Control* must allow IRL Homekit's open-source tools. The installer checks this and tells you if it
   doesn't ([details](docs/TROUBLESHOOTING.md#windows-blocks-the-tools-smart-app-control)).
-- A home connection with a **public IPv4** you can port-forward (most fiber/cable; not CGNAT, see [ROUTER.md](docs/ROUTER.md))
+- A home connection with a **public IPv4** you can port-forward (most fiber/cable; see [ROUTER.md](docs/ROUTER.md)), **or** a
+  free relay server if you can't forward ports or are behind CGNAT ([RELAY.md](docs/RELAY.md), Setup walks you through it)
 - Optional, to reach the dashboard from your phone anywhere: a **free** name from [DuckDNS](https://www.duckdns.org) or a
   domain you own (about $10/year). A guided setup does the rest: see [Remote dashboard](#remote-dashboard).
 - Optional for the self-test: ffmpeg, `winget install Gyan.FFmpeg`
@@ -61,6 +64,17 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Sup
 Nothing else to install: IRL Homekit brings its own copy of Node.js (for the dashboard) if your PC doesn't have it.
 
 ## Install
+
+**Easiest:** download **`IRL-Homekit-Setup-<version>.exe`** from the [latest release](https://github.com/CursedByJava/irl-homekit/releases)
+and run it. It's a normal setup wizard: your channels, which OBS scenes and overlays to bring over, a dashboard login,
+how your phone reaches the PC (router port forwarding, or a free relay server with no port forwarding), the remote
+dashboard, and start with Windows. Then it installs everything with a progress bar and shows your login and next
+steps. (Setup.exe isn't signed with a paid certificate yet, so Windows may say "unknown publisher": **More info → Run
+anyway**.) Running it again updates IRL Homekit and keeps your settings.
+Run it while signed in to the Windows account you stream from, and make that an administrator account: if Windows
+asks for a *different* account's password, IRL Homekit gets set up for that account instead.
+
+**Or from the source code** (same result, questions in a console window):
 
 1. Download this repo: green **Code** button → **Download ZIP**, then right-click the ZIP → **Extract All**.
 2. Open the extracted folder and double-click **`Install IRL Homekit.cmd`**.
@@ -143,7 +157,8 @@ and reopens IRL Homekit, in about 2 minutes. While IRL Homekit is a beta you get
 
 **Settings → Apps → IRL Homekit → Uninstall** (or Start menu → *IRL Homekit - Uninstall*). It closes IRL Homekit
 and removes its shortcuts, tasks, firewall rules and app entry, and asks whether to delete `C:\IRLHomekit` too.
-Your regular OBS isn't touched. Remember to remove the port forwards on your router.
+Your regular OBS isn't touched. Remember to remove the port forwards on your router (or delete the relay VM in Oracle
+Cloud if you used one).
 ## Remote dashboard
 
 Reach your dashboard and Studio from your phone anywhere at `https://your-name...`, with a free HTTPS certificate.
@@ -159,7 +174,8 @@ Then it sets up the web server and firewall and **checks everything for you**, w
 isn't right yet:
 
 - the name points to your home IP (it waits while new DNS records appear)
-- your router forwards ports 80 and 443 (it offers to open your router's page, see [ROUTER.md](docs/ROUTER.md))
+- your router forwards ports 80 and 443 (it offers to open your router's page, see [ROUTER.md](docs/ROUTER.md)), or,
+  with a relay server, that the relay lets them in ([RELAY.md](docs/RELAY.md))
 - the free HTTPS certificate was issued
 
 Run it again any time to re-check or switch. The dashboard's *Home PC* card also shows **Remote access**: working, or
@@ -215,11 +231,12 @@ Connecting Kick and YouTube uses your own free developer app on each platform. S
 | Piece | Port | Notes |
 |---|---|---|
 | go-irl | UDP 5000 (public) → UDP 5002 (local, OBS) | Encrypted with a generated passphrase |
-| MediaMTX | UDP 8890 SRT, TCP 1935 RTMP (public); API 127.0.0.1:9997 | Publishing needs user/password; RTSP/HLS/WebRTC off |
+| MediaMTX | UDP 8890 SRT, TCP 1935 RTMP (public); API 127.0.0.1:9997 | Publishing and reading need a user/password; RTSP/HLS/WebRTC off |
 | IRL Homekit OBS | WebSocket 4456 (not forwarded) | Portable OBS Studio in `C:\IRLHomekit\obs`; NOALBS + dashboard control it through its WebSocket (4456, so it never clashes with your regular OBS on 4455) |
 | NOALBS | — | Reads go-irl/MediaMTX stats; LOW < 1000 kbps, BRB < 300 kbps; ends stream after 20 min on BRB |
 | Dashboard | 127.0.0.1:8090 | `dashboard/server.mjs`, Node built-ins only |
 | Caddy | TCP 443/80 (public) | Automatic Let's Encrypt certificate |
+| frpc (optional) | outgoing UDP/TCP 7000 to your relay | Only with a relay server ([RELAY.md](docs/RELAY.md)): the relay receives the public ports above and passes them to this PC |
 | App | — | `scripts/Start-IRLHomekit.ps1`: opens the OBS, keeps every part running, stops everything when the OBS closes |
 
 Files after install (`C:\IRLHomekit`): `secrets.json` (generated passwords, **never share**), `settings.json`,

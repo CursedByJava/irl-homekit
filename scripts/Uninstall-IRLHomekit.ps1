@@ -22,7 +22,7 @@ $wipe = $DeleteFiles -or (-not $Yes -and (Read-Host "Also delete $InstallDir (se
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -like '*Start-IRLHomekit.ps1*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Get-Process obs64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\obs\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process noalbs, go-irl, mediamtx, caddy, frpc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 $dash = (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
 if ($dash) { Stop-Process -Id $dash -Force -ErrorAction SilentlyContinue }
 Write-Host '  closed'

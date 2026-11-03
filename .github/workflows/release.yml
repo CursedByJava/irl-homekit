@@ -1,7 +1,8 @@
 # Publishes the GitHub release for the version in VERSION, with that version's section of CHANGELOG.md as the
 # notes. Runs when VERSION (or this file) changes on main, when a v* tag is pushed, or by hand (Actions > Release >
 # Run workflow). Does nothing if that version's release already exists. Versions with a "-" (betas) are published
-# as pre-releases. The app's update checker reads these releases.
+# as pre-releases. The app's update checker reads these releases. A second job builds IRL-Homekit-Setup-<version>.exe
+# (installer/IRLHomekit.iss, Inno Setup) on Windows and attaches it to the release.
 name: Release
 on:
   push:
@@ -14,6 +15,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      ver: ${{ steps.v.outputs.ver }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -33,10 +36,30 @@ jobs:
           ver="${{ steps.v.outputs.ver }}"
           awk -v v="$ver" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > notes.md
           test -s notes.md || { echo "No '## [$ver]' section in CHANGELOG.md"; exit 1; }
-          printf '\n---\n**Install:** download the source code zip below, extract it and double-click `Install IRL Homekit.cmd`.\n**Update:** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
+          printf '\n---\n**Install:** download **IRL-Homekit-Setup-'"$ver"'.exe** below and run it (Windows may say it is from an unknown publisher: More info > Run anyway). Or download the source code zip, extract it and double-click `Install IRL Homekit.cmd`.\n**Update:** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
       - name: Create release
         if: steps.v.outputs.exists != 'true'
         run: |
           ver="${{ steps.v.outputs.ver }}"
           pre=""; case "$ver" in *-*) pre="--prerelease" ;; esac
           gh release create "v$ver" --target "$GITHUB_SHA" --title "IRL Homekit $ver" --notes-file notes.md $pre
+
+  setup-exe:
+    needs: release
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VER: ${{ needs.release.outputs.ver }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 -y --no-progress   # pinned: Inno Setup 7 installs to a different folder
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VER" installer\IRLHomekit.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Attach it to the release
+        shell: pwsh
+        run: gh release upload "v$env:VER" "installer\Output\IRL-Homekit-Setup-$env:VER.exe" --clobber

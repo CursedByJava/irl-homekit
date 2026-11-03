@@ -34,6 +34,12 @@ function Studio-For($d) { if ($d -match '^[a-z0-9-]+\.duckdns\.org$') { "studio.
 $public = try { (Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 10).Trim() } catch { '' }
 $gateway = (Get-NetIPConfiguration | Where-Object IPv4DefaultGateway | Select-Object -First 1).IPv4DefaultGateway.NextHop
 $lan = (Get-NetIPConfiguration | Where-Object IPv4DefaultGateway | Select-Object -First 1).IPv4Address.IPAddress
+# With a relay server (docs/RELAY.md), names point at the relay and it brings ports 80/443 to this PC; no router setup.
+$relayHost = $settings.relayHost
+$relayIp = if (-not $relayHost) { '' } elseif ($relayHost -match '^\d{1,3}(\.\d{1,3}){3}$') { $relayHost } else {
+    try { ([Net.Dns]::GetHostAddresses($relayHost) | Where-Object AddressFamily -eq 'InterNetwork' | Select-Object -First 1).IPAddressToString } catch { '' } }
+$target = if ($relayHost) { $relayIp } else { $public }
+$targetName = if ($relayHost) { "your relay ($relayIp)" } else { "your home IP ($public)" }
 
 Write-Host "`nIRL Homekit - remote dashboard" -ForegroundColor Magenta
 Write-Host "Open your dashboard and Studio from your phone anywhere, with free HTTPS."
@@ -43,7 +49,7 @@ if ($settings.domain) { Write-Host "Now: https://$($settings.domain)  (Studio: h
 $mode = if ($Off) { 'off' } elseif ($DuckDnsName) { 'duck' } elseif ($Domain) { 'own' } elseif ($CheckOnly) { 'check' } else { '' }
 if ($interactive) {
     Head 'How do you want to reach your dashboard?'
-    Write-Host '  1  Free name from DuckDNS, like yourname.duckdns.org  (recommended, 2 minutes, follows your home IP)'
+    Write-Host "  1  Free name from DuckDNS, like yourname.duckdns.org  (recommended, 2 minutes, follows your $(if ($relayHost) { 'relay' } else { 'home IP' }))"
     Write-Host '  2  A domain I own, like irl.yourname.com             (about $10/year; see docs\DOMAIN.md for cheap ones)'
     Write-Host '  3  This PC only (turn remote access off)'
     if ($settings.domain) { Write-Host '  Enter  keep the current setup and just check it' }
@@ -72,8 +78,8 @@ if ($mode -eq 'own' -and $interactive) {
     Head 'Add these two records in your domain''s DNS settings'
     Write-Host ''
     Write-Host ('    Type  Name                     Value')
-    Write-Host ('    A     {0,-24} {1}' -f ($Domain -replace '\..*$', ''), $(if ($public) { $public } else { '<your public IP>' }))
-    Write-Host ('    A     {0,-24} {1}' -f ($st -replace '\..*$', ''), $(if ($public) { $public } else { '<your public IP>' }))
+    Write-Host ('    A     {0,-24} {1}' -f ($Domain -replace '\..*$', ''), $(if ($target) { $target } else { '<your public IP>' }))
+    Write-Host ('    A     {0,-24} {1}' -f ($st -replace '\..*$', ''), $(if ($target) { $target } else { '<your public IP>' }))
     Write-Host ''
     Say 'Where to find DNS settings:'
     Say '  GoDaddy:     My Products > your domain > DNS > Add New Record'
@@ -88,9 +94,9 @@ if ($mode -eq 'own' -and $interactive) {
 if ($mode -in 'duck', 'own', 'off') {
     Head 'Saving'
     if ($mode -eq 'duck') {
-        $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$DuckDnsName&token=$DuckDnsToken" -TimeoutSec 15 } catch { "error: $($_.Exception.Message)" }
+        $r = try { Invoke-RestMethod "https://www.duckdns.org/update?domains=$DuckDnsName&token=$DuckDnsToken$(if ($relayIp) { "&ip=$relayIp" })" -TimeoutSec 15 } catch { "error: $($_.Exception.Message)" }
         if ($r -ne 'OK') { throw "DuckDNS refused that name and token ($r). Check both on duckdns.org and run this again." }
-        Ok "$DuckDnsName.duckdns.org now points at this PC ($public); IRL Homekit keeps it up to date"
+        Ok "$DuckDnsName.duckdns.org now points at $targetName; IRL Homekit keeps it up to date"
         $Domain = "$DuckDnsName.duckdns.org"
         $secrets | Add-Member -Force duckdnsToken $DuckDnsToken
     }
@@ -105,7 +111,8 @@ if ($mode -in 'duck', 'own', 'off') {
     $caddyfile = "$InstallDir\caddy\Caddyfile"
     if ($newDomain) {
         $tpl = [IO.File]::ReadAllText("$InstallDir\templates\Caddyfile")
-        [IO.File]::WriteAllText($caddyfile, $tpl.Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$newDomain, $($settings.studioDomain)"), $utf8)
+        $servers = if ($relayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 127.0.0.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
+        [IO.File]::WriteAllText($caddyfile, $tpl.Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$newDomain, $($settings.studioDomain)").Replace('{{SERVERS}}', $servers), $utf8)
         foreach ($p in 443, 80) {
             $name = "IRL Homekit - Dashboard HTTP$(if ($p -eq 443) { 'S' }) (TCP $p)"
             Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule
@@ -149,16 +156,16 @@ foreach ($name in $d, $st) {
     $ip = $null; $deadline = (Get-Date).AddMinutes($(if ($interactive) { 3 } else { 1 }))
     do {
         try { $ip = (Resolve-DnsName $name -Server 1.1.1.1 -Type A -DnsOnly -QuickTimeout -ErrorAction Stop | Where-Object IPAddress | Select-Object -First 1).IPAddress } catch { $ip = $null }
-        if ($ip -eq $public) { break }
+        if ($ip -eq $target) { break }
         Start-Sleep 10
     } while ((Get-Date) -lt $deadline)
-    if ($ip -eq $public) { Ok "$name points to your home IP ($public)" }
+    if ($ip -eq $target) { Ok "$name points to $targetName" }
     else {
         $dnsOk = $false
         if (-not $ip) { Bad "$name doesn't exist yet. Add its DNS record (new records can take up to 30 minutes to appear)." }
         else {
-            Bad "$name points to $ip, but your home IP is $public."
-            Say 'Update its A record to your home IP. On Cloudflare, set Proxy status to "DNS only" (grey cloud).'
+            Bad "$name points to $ip, but it should point to $targetName."
+            Say "Update its A record to $target. On Cloudflare, set Proxy status to `"DNS only`" (grey cloud)."
         }
     }
 }
@@ -178,10 +185,13 @@ foreach ($name in $d, $st) {
     $err = Get-Content "$InstallDir\logs\caddy.log" -Tail 200 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"level":"error"' -and $_ -match [regex]::Escape($name) } | Select-Object -Last 1
     if (-not $dnsOk) { Bad "No certificate for $name yet: fix DNS first, then run this again." }
     elseif ($err -match 'Timeout during connect|Connection refused|connection reset|firewall|Timeout after connect') {
-        Bad "Let's Encrypt couldn't reach this PC for $name. Your router isn't forwarding ports 80 and 443 yet."
-    } else { Bad "No certificate for $name yet. Usually the router isn't forwarding ports 80 and 443." }
+        Bad "Let's Encrypt couldn't reach this PC for $name. $(if ($relayHost) { 'The relay isn''t passing ports 80 and 443 through yet.' } else { 'Your router isn''t forwarding ports 80 and 443 yet.' })"
+    } else { Bad "No certificate for $name yet. $(if ($relayHost) { 'Usually the relay VM doesn''t let ports 80 and 443 in yet.' } else { 'Usually the router isn''t forwarding ports 80 and 443.' })" }
 }
-if (-not $certOk -and $dnsOk) {
+if (-not $certOk -and $dnsOk -and $relayHost) {
+    Say 'On Oracle Cloud: your VM > Subnet > Security list > Add ingress rules for TCP 80 and TCP 443 (source 0.0.0.0/0).'
+    Say 'Also check Status (Start menu) shows the relay as connected. Step by step: docs\RELAY.md'
+} elseif (-not $certOk -and $dnsOk) {
     Say "On your router, forward TCP 80 and TCP 443 to this PC ($lan). Router steps: docs\ROUTER.md"
     if ($interactive -and $gateway -and (Read-Host "Open your router's page ($gateway) now? (Y/n)") -notmatch '^n') { Start-Process "http://$gateway" }
 }

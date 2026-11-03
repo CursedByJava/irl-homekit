@@ -91,7 +91,15 @@ function New-Scene($sceneName, $items) {
 $feedCommon = @{ is_local_file = $false; input_format = 'mpegts'; restart_on_activate = $false; close_when_inactive = $false
     hw_decode = $true; reconnect_delay_sec = 1; buffering_mb = 1; looping = $false }
 $bondedSettings = $feedCommon.Clone(); $bondedSettings.input = 'udp://127.0.0.1:5002'
-$backupSettings = $feedCommon.Clone(); $backupSettings.input = 'srt://127.0.0.1:8890?streamid=read:live'; $backupSettings.reconnect_delay_sec = 2
+# MediaMTX only lets OBS read the backup feed with its own login (secrets.json next to the overlays folder): with a
+# relay server, outside connections also arrive from this PC (127.0.0.1), so "local" alone can't be trusted.
+$readId = 'read:live'
+$secFile = Join-Path (Split-Path $OverlayDir -Parent) 'secrets.json'
+if (Test-Path $secFile) {
+    $sec = Get-Content $secFile -Raw | ConvertFrom-Json
+    if ($sec.mediamtxReadUser -and $sec.mediamtxReadPass) { $readId = "read:live:$($sec.mediamtxReadUser):$($sec.mediamtxReadPass)" }
+}
+$backupSettings = $feedCommon.Clone(); $backupSettings.input = "srt://127.0.0.1:8890?streamid=$readId"; $backupSettings.reconnect_delay_sec = 2
 $bonded = New-Source 'IRL Phone (Bonded)' 'ffmpeg_source' 'ffmpeg_source' $bondedSettings 255
 $backup = New-Source 'IRL Phone (Backup)' 'ffmpeg_source' 'ffmpeg_source' $backupSettings 255
 
