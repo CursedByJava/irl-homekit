@@ -54,7 +54,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Inno Setup
         shell: pwsh
-        run: choco install innosetup --version=6.7.1 -y --no-progress   # pinned: Inno Setup 7 installs to a different folder
+        # The same signed release the installer is built and tested with, checksum-verified (Inno Setup 7 differs).
+        run: |
+          $exe = "$env:RUNNER_TEMP\innosetup-6.7.4.exe"
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe' -OutFile $exe
+          if ((Get-FileHash $exe).Hash -ne 'A549929319F9120716677C685535CA4671E4B937B5FDC87E2585F32D8EB30E8C') { throw 'Inno Setup download: checksum mismatch' }
+          if ((Get-AuthenticodeSignature $exe).Status -ne 'Valid') { throw 'Inno Setup download: bad signature' }
+          Start-Process $exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"${env:ProgramFiles(x86)}\Inno Setup 6`"" -Wait
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw 'Inno Setup did not install' }
       - name: Build Setup.exe
         shell: pwsh
         run: |

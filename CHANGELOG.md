@@ -11,7 +11,7 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
-## [1.0.0-beta.12] - 2026-11-02
+## [1.0.0-beta.12] - 2026-11-03
 
 ### Added
 - **Setup.exe: a real Windows setup wizard.** Download `IRL-Homekit-Setup-<version>.exe` from the release and click
