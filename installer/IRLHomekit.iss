@@ -1245,6 +1245,15 @@ begin
     S := S + '  NEXT: scan the QR code on the right with your phone''s camera and tap the link.' + NL +
       '  Your phone opens the dashboard signed in; tap Open in IRL Pro there and IRL Pro is set up.' + NL;
   end
+  else if HasRemoteDashboard and (QrStatus = 'otherdevice') then
+    S := S + '  ONE THING TO FIX: your router sends ports 443 and 80 to ANOTHER device on your network (maybe another PC' + NL +
+      '  with IRL Homekit), not this one, so your phone can''t reach this dashboard yet. In your router''s port forwarding,' + NL +
+      '  point TCP 443 and TCP 80 at this PC, or delete those two rules (IRL Homekit then opens them by itself).' + NL +
+      '  Then: Start menu > IRL Homekit - Connect my phone shows the QR code.' + NL
+  else if HasRemoteDashboard and (QrStatus = 'unreachable') then
+    S := S + '  Your phone can''t reach this PC from the internet yet (ports 443 and 80, or your internet connection doesn''t' + NL +
+      '  take incoming connections). Start menu > IRL Homekit - Set up remote dashboard checks it and says what to do.' + NL +
+      '  Once it works: Start menu > IRL Homekit - Connect my phone shows the QR code.' + NL
   else if HasRemoteDashboard and (QrStatus = 'nocert') then
     S := S + '  Your dashboard''s HTTPS certificate isn''t ready yet: usually the internet can''t reach this PC on ports' + NL +
       '  80/443 (router, or carrier-grade NAT). Start menu > IRL Homekit - Set up remote dashboard checks it and says what to do.' + NL +

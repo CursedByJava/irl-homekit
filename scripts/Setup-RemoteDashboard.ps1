@@ -205,6 +205,10 @@ foreach ($name in $names) {
     $certOk = $false
     $err = Get-Content "$InstallDir\logs\caddy.log" -Tail 200 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"level":"error"' -and $_ -match [regex]::Escape($name) } | Select-Object -Last 1
     if (-not $dnsOk) { Bad "No certificate for $name yet: fix DNS first, then run this again." }
+    elseif ($err -match 'Incorrect validation certificate|Cannot negotiate ALPN|tls: internal error|Error getting validation data|Invalid response from') {
+        Bad "Let's Encrypt reached ANOTHER device on your network, not this PC: your router sends ports 443 and 80 somewhere else (maybe another PC with IRL Homekit)."
+        Say "In your router's port forwarding, point TCP 443 and TCP 80 at this PC ($lan), or delete those two rules so IRL Homekit opens them by itself."
+    }
     elseif ($err -match 'Timeout during connect|Connection refused|connection reset|firewall|Timeout after connect') {
         Bad "Let's Encrypt couldn't reach this PC for $name. $(if ($relayHost) { 'The relay isn''t passing ports 80 and 443 through yet.' } else { 'Your router isn''t forwarding ports 80 and 443 yet.' })"
     } else { Bad "No certificate for $name yet. $(if ($relayHost) { 'Usually the relay VM doesn''t let ports 80 and 443 in yet.' } else { 'Usually the router isn''t forwarding ports 80 and 443.' })" }

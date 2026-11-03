@@ -672,10 +672,28 @@ function clientIp(req) { return (req.headers['x-forwarded-for'] || '').split(','
 // on this PC itself or by someone already signed in.
 const pairCodes = new Map();   // code -> expiry ms
 const PAIR_MS = 10 * 60e3;
+// Is the dashboard's HTTPS certificate there yet, and if not, why (Let's Encrypt's answer, in the web server's log):
+// another device answered on this home's address (the router sends 443/80 to another PC), or nothing answered.
+function certState() {
+  const d = settings.domain;
+  if (hasCert(d)) return { ready: true };
+  let err = '';
+  try {
+    const f = path.join(ROOT, 'logs', 'caddy.log'), size = fs.statSync(f).size, len = Math.min(size, 256 * 1024), buf = Buffer.alloc(len);
+    const fd = fs.openSync(f, 'r'); fs.readSync(fd, buf, 0, len, size - len); fs.closeSync(fd);
+    err = buf.toString('utf8').split('\n').filter((l) => l.includes('"level":"error"') && l.includes(d)).pop() || '';
+  } catch { }
+  const lan = secrets.lanIp || 'this PC';
+  if (/Incorrect validation certificate|Cannot negotiate ALPN|tls: internal error|Error getting validation data|Invalid response from/.test(err)) {
+    return { ready: false, problem: 'OTHER_DEVICE', lan };
+  }
+  if (/Timeout during connect|Connection refused|connection reset|Timeout after connect|Fetching http/.test(err)) return { ready: false, problem: 'UNREACHABLE', lan };
+  return { ready: false, problem: 'NO_CERT', lan };
+}
 function newPairLink() {
   if (!settings.domain) return { url: '', error: 'NO_DOMAIN' };
   // Never hand out a link the phone can't open: without a certificate https://<domain> answers nothing.
-  if (!hasCert(settings.domain)) return { url: '', error: 'NO_CERT', domain: settings.domain };
+  if (!hasCert(settings.domain)) return { url: '', error: 'NO_CERT', domain: settings.domain, cert: certState() };
   for (const [c, exp] of pairCodes) if (exp < Date.now()) pairCodes.delete(c);
   if (pairCodes.size > 20) pairCodes.delete(pairCodes.keys().next().value);
   const code = crypto.randomBytes(18).toString('base64url');
