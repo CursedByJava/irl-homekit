@@ -1,8 +1,10 @@
 # Publishes the GitHub release for the version in VERSION, with that version's section of CHANGELOG.md as the
 # notes. Runs when VERSION (or this file) changes on main, when a v* tag is pushed, or by hand (Actions > Release >
-# Run workflow). Does nothing if that version's release already exists. Versions with a "-" (betas) are published
-# as pre-releases. The app's update checker reads these releases. A second job builds IRL-Homekit-Setup-<version>.exe
-# (installer/IRLHomekit.iss, Inno Setup) on Windows and attaches it to the release.
+# Run workflow). If that version's release already exists, its notes, flags and Setup.exe are brought up to date.
+# Until there's a stable release, the newest beta is published as the "Latest" release (not a pre-release), so the
+# README's download button (releases/latest/download/IRL-Homekit-Setup.exe) always gets it; after that, betas are
+# pre-releases. The app's update checker reads these releases. A second job builds IRL-Homekit-Setup.exe
+# (installer/IRLHomekit.iss, Inno Setup) on Windows from the release's tag and attaches it to the release.
 name: Release
 on:
   push:
@@ -31,18 +33,25 @@ jobs:
           fi
           if gh release view "v$ver" > /dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; fi
       - name: Release notes from CHANGELOG.md
-        if: steps.v.outputs.exists != 'true'
         run: |
           ver="${{ steps.v.outputs.ver }}"
-          awk -v v="$ver" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > notes.md
-          test -s notes.md || { echo "No '## [$ver]' section in CHANGELOG.md"; exit 1; }
-          printf '\n---\n**Install:** download **IRL-Homekit-Setup-'"$ver"'.exe** below and run it (Windows may say it is from an unknown publisher: More info > Run anyway). If Windows blocks it outright (Smart App Control), install with one line instead: open PowerShell and paste `irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex` (same installer).\n**Update:** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
-      - name: Create release
-        if: steps.v.outputs.exists != 'true'
+          exe="https://github.com/$GITHUB_REPOSITORY/releases/download/v$ver/IRL-Homekit-Setup.exe"
+          printf '### [Download IRL-Homekit-Setup.exe](%s) (Windows 10/11)\nRun it and follow the setup wizard. It is not code-signed yet, so Windows may say it is from an unknown publisher: **More info > Run anyway**. If Windows blocks it outright (Smart App Control), install with one line instead: open PowerShell and paste `irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex` (same installer).\n\n' "$exe" > notes.md
+          awk -v v="$ver" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > changes.md
+          test -s changes.md || { echo "No '## [$ver]' section in CHANGELOG.md"; exit 1; }
+          cat changes.md >> notes.md
+          printf '\n---\n**Already installed?** IRL Homekit offers this update by itself (or Start menu > IRL Homekit - Check for updates).\n' >> notes.md
+      - name: Create or update the release
         run: |
           ver="${{ steps.v.outputs.ver }}"
-          pre=""; case "$ver" in *-*) pre="--prerelease" ;; esac
-          gh release create "v$ver" --target "$GITHUB_SHA" --title "IRL Homekit $ver" --notes-file notes.md $pre
+          stable=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft | not) | select(.tag_name | contains("-") | not)] | length')
+          pre=false; case "$ver" in *-*) [ "$stable" -gt 0 ] && pre=true ;; esac
+          latest=true; [ "$pre" = true ] && latest=false
+          if [ "${{ steps.v.outputs.exists }}" = true ]; then
+            gh release edit "v$ver" --title "IRL Homekit $ver" --notes-file notes.md --prerelease=$pre --latest=$latest
+          else
+            gh release create "v$ver" --target "$GITHUB_SHA" --title "IRL Homekit $ver" --notes-file notes.md --prerelease=$pre --latest=$latest
+          fi
 
   setup-exe:
     needs: release
@@ -52,6 +61,8 @@ jobs:
       VER: ${{ needs.release.outputs.ver }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v${{ env.VER }}   # the release's own files, also when this runs again for an existing release
       - name: Install Inno Setup
         shell: pwsh
         # The same signed release the installer is built and tested with, checksum-verified (Inno Setup 7 differs).
@@ -99,4 +110,11 @@ jobs:
             if ($sig.Status -ne 'Valid') { throw "Signed Setup.exe has signature status $($sig.Status)" }
             $exe = $signed; Write-Host "Signed by $($sig.SignerCertificate.Subject)"
           }
-          gh release upload "v$env:VER" $exe --clobber
+          # Always the same name, so releases/latest/download/IRL-Homekit-Setup.exe is a permanent download link.
+          Copy-Item $exe "$env:RUNNER_TEMP\IRL-Homekit-Setup.exe"
+          gh release upload "v$env:VER" "$env:RUNNER_TEMP\IRL-Homekit-Setup.exe" --clobber
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # Older releases had the version in the name: drop that copy so there's one Setup.exe to pick.
+          if ((gh release view "v$env:VER" --json assets --jq '.assets[].name') -contains "IRL-Homekit-Setup-$env:VER.exe") {
+            gh release delete-asset "v$env:VER" "IRL-Homekit-Setup-$env:VER.exe" --yes
+          }
