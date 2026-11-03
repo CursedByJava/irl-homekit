@@ -11,6 +11,11 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Changed
+- **Blocked by Windows? The one-line install is now right under the download button** (README and release notes),
+  with a copy button: right-click Start, Terminal, paste, Enter. It runs the same installer, and Smart App Control has
+  nothing to block. Setup.exe stays unsigned (signing costs money every year).
+
 ## [1.0.0-beta.17] - 2026-11-03
 
 ### Added

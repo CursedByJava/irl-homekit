@@ -5,7 +5,15 @@
   <br>
   <a href="https://github.com/CursedByJava/irl-homekit/releases/latest"><img src="https://img.shields.io/github/v/release/CursedByJava/irl-homekit?display_name=tag&label=latest&color=2b2b2e" alt="Latest version"></a>
 </p>
-<p align="center"><sub>Free · Windows 10/11 · not code-signed yet, so if Windows says <i>unknown publisher</i>: <b>More info → Run anyway</b> · <a href="#install">other ways to install</a></sub></p>
+<p align="center"><sub>Free · Windows 10/11 · if Windows says <i>unknown publisher</i>: <b>More info → Run anyway</b></sub></p>
+
+**Windows blocked the download?** (Windows 11's *Smart App Control* blocks programs that aren't code-signed.)
+Install with one line instead, it's the same installer: right-click the **Start** button → **Terminal**, paste
+this (the copy button is on the right) and press **Enter**:
+
+```powershell
+irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex
+```
 
 > **Beta.** IRL Homekit works end to end, but it's new: expect some rough edges. Please report anything odd on the
 > [issues page](https://github.com/CursedByJava/irl-homekit/issues) (Start menu → *IRL Homekit - Save diagnostics*
@@ -21,7 +29,8 @@ signal and control everything from the street.
 **Get started in 3 steps**
 
 1. **[Download IRL-Homekit-Setup.exe](https://github.com/CursedByJava/irl-homekit/releases/latest/download/IRL-Homekit-Setup.exe)**
-   and run it. Sign in with Twitch on its first page; everything else can stay as it is.
+   and run it (blocked? use the one line above). Sign in with Twitch on its first page; everything else can stay
+   as it is.
 2. At the end, scan the **QR code** with your phone's camera: your dashboard opens on the phone, signed in.
 3. Tap **Open in IRL Pro** there. IRL Pro is set up. Go live.
 
@@ -90,7 +99,7 @@ custom destination, which OBS scenes and overlays to bring over, a dashboard log
 (through your home router, which IRL Homekit opens by itself, or a relay server), the remote dashboard, and start
 with Windows. Then it installs everything with a progress bar and shows your login and next steps. Running it again
 updates IRL Homekit and keeps your settings, or changes your channels and connection if you tick those boxes.
-(Setup.exe isn't code-signed yet, so Windows may say "unknown publisher": **More info → Run anyway**. On PCs with
+(Setup.exe isn't code-signed (that costs money every year), so Windows may say "unknown publisher": **More info → Run anyway**. On PCs with
 Smart App Control on, Windows can block it outright: then use the one-line install below, which does exactly
 the same.)
 Run it while signed in to the Windows account you stream from, and make that an administrator account: if Windows

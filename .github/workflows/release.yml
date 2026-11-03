@@ -36,7 +36,7 @@ jobs:
         run: |
           ver="${{ steps.v.outputs.ver }}"
           exe="https://github.com/$GITHUB_REPOSITORY/releases/download/v$ver/IRL-Homekit-Setup.exe"
-          printf '### [Download IRL-Homekit-Setup.exe](%s) (Windows 10/11)\nRun it and follow the setup wizard. It is not code-signed yet, so Windows may say it is from an unknown publisher: **More info > Run anyway**. If Windows blocks it outright (Smart App Control), install with one line instead: open PowerShell and paste `irm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex` (same installer).\n\n' "$exe" > notes.md
+          printf '### [Download IRL-Homekit-Setup.exe](%s) (Windows 10/11)\nRun it and follow the setup wizard. It isn'"'"'t code-signed, so Windows may say it is from an unknown publisher: **More info > Run anyway**.\n\n**Windows blocked it?** (Smart App Control) Install with one line instead, same installer: right-click Start > **Terminal**, paste this and press Enter:\n```powershell\nirm https://raw.githubusercontent.com/CursedByJava/irl-homekit/main/get.ps1 | iex\n```\n\n' "$exe" > notes.md
           awk -v v="$ver" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > changes.md
           test -s changes.md || { echo "No '## [$ver]' section in CHANGELOG.md"; exit 1; }
           cat changes.md >> notes.md
