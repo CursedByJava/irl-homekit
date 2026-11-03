@@ -247,11 +247,11 @@ function dashboard() {
       const o = el('option', '', names[p] + (c.platforms[p] ? '' : ' (no clips API yet)')); o.value = p; o.disabled = !c.platforms[p]; return o;
     }));
     $('clipsPlatform').value = c.platform; $('clipsPeriod').value = c.period;
-    $('clipsDesc').textContent = c.error === 'TWITCH_NOT_CONNECTED' ? 'Twitch isn\'t connected yet: on the PC, Start menu > IRL Homekit - Twitch chat token.'
+    $('clipsDesc').textContent = c.error === 'TWITCH_NOT_CONNECTED' ? 'Twitch isn\'t connected yet: on the PC, Start menu > IRL Homekit - Connect Twitch.'
       : c.error ? 'Couldn\'t get your clips: ' + c.error
       : c.count === null ? 'Checking…'
       : !c.count ? 'No clips in that time range yet. Pick a longer one, or make some clips.'
-      : c.count + (c.count === 1 ? ' clip' : ' clips') + ', played in random order.' + (c.files === false ? ' Plays them in Twitch\'s player. For a cleaner look, make a new Twitch chat token with channel:manage:clips ticked too.' : '');
+      : c.count + (c.count === 1 ? ' clip' : ' clips') + ', played in random order.' + (c.files === false ? ' Plays them in Twitch\'s player. For a cleaner look, sign in again: on the PC, Start menu > IRL Homekit - Connect Twitch.' : '');
   }
   $('clipsToggle').onclick = () => {
     const on = !s.clips.on, ready = !s.clips.error && s.clips.count;

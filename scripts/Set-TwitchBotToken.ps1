@@ -4,7 +4,7 @@
 #    as plain video, also enable channel:manage:clips and authorize with your channel's own account.
 # 2. Run:  powershell -ExecutionPolicy Bypass -File C:\IRLHomekit\scripts\Set-TwitchBotToken.ps1 -BotUsername <login> -Token <access token> -RefreshToken <refresh token>
 # The watchdog then refreshes the token automatically (scripts\Refresh-TwitchToken.ps1).
-#    Or just open Start menu > "IRL Homekit - Twitch chat token" and paste when asked.
+# Easier: Start menu > "IRL Homekit - Connect Twitch" (scripts\Connect-Twitch.ps1) signs in with no tokens to copy.
 param([string] $BotUsername, [string] $Token, [string] $RefreshToken)
 $ErrorActionPreference = 'Stop'
 $settingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) 'settings.json'

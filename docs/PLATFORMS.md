@@ -13,12 +13,12 @@ Everything stays on your PC: tokens are saved in `secrets.json`, nothing goes th
 Twitch's go-live notification text can't be changed by any outside tool; Studio links to the right Twitch page.
 
 ## Twitch
-1. https://twitchtokengenerator.com → enable only **chat:read**, **chat:edit**, **channel:manage:broadcast** →
-   *Generate Token* → *Authorize* → solve the CAPTCHA.
-2. Start menu → **IRL Homekit - Twitch chat token**, and paste the Access and Refresh tokens.
+1. Sign in with Twitch in Setup, or later: Start menu → **IRL Homekit - Connect Twitch**. A small window shows a
+   code and Twitch opens in your browser: check the code, click **Authorize**.
+2. That's it: chat commands, Studio (chat, title, category), your stream key and clips on BRB are set up, and the
+   sign-in renews itself. Sign out any time: twitch.tv → Settings → Connections → IRL Homekit.
 
-For **clips on BRB** (dashboard → Clips), also enable **channel:manage:clips** and authorize with your channel's own
-account: then the clips play as plain video. Without it they play in Twitch's own player, which works too.
+Made a token by hand before (TwitchTokenGenerator)? It keeps working; Connect Twitch replaces it whenever you like.
 
 ## Kick (about 3 minutes)
 1. kick.com → **Settings → Developer → Create new**.

@@ -18,8 +18,8 @@ function explain(action, msg) {
   if (/TITLE_LENGTH/.test(msg)) return ['Title needs 1–140 characters.', 'Twitch doesn\'t allow empty titles or more than 140 characters.'];
   if (/EMPTY_MESSAGE/.test(msg)) return ['Type a message first.', ''];
   if (/TWITCH_CHAT_DOWN/.test(msg)) return ['Twitch chat is reconnecting.', 'The connection to Twitch chat dropped. It reconnects by itself within a few seconds. Try again then.'];
-  if (/Twitch 401/.test(msg)) return ['Twitch rejected the login.', 'The Twitch token was revoked or expired. Run the "IRL Homekit - Twitch chat token" shortcut on the PC to make a new one.'];
-  if (/Twitch 403/.test(msg)) return ['Twitch says that\'s not allowed.', 'The token is missing a permission. Make a new token with chat:read, chat:edit and channel:manage:broadcast.'];
+  if (/Twitch 401/.test(msg)) return ['Twitch rejected the login.', 'The Twitch token was revoked or expired. Sign in again: on the PC, Start menu > IRL Homekit - Connect Twitch.'];
+  if (/Twitch 403/.test(msg)) return ['Twitch says that\'s not allowed.', 'The token is missing a permission. Sign in again (on the PC, Start menu > IRL Homekit - Connect Twitch) and approve every permission.'];
   if (/YOUTUBE_NOT_CONNECTED/.test(msg)) return ['YouTube isn\'t connected.', 'Tap Connect next to YouTube under "Your channels" and approve the Google sign-in.'];
   if (/YOUTUBE_NOT_LIVE/.test(msg)) return ['YouTube chat opens when you\'re live.', 'YouTube only has a chat while a broadcast is live. Go live first, then send.'];
   if (/YouTube 403: (quotaExceeded|dailyLimitExceeded)/.test(msg)) return ['YouTube\'s daily limit is used up.', 'Google allows a fixed number of requests per day. YouTube chat and title changes come back after midnight Pacific time.'];

@@ -374,8 +374,13 @@ state.platforms = { twitch: { connected: false }, kick: { connected: false }, yo
 const chat = []; let chatSeq = 0;
 function pushChat(m) { m.id = ++chatSeq; m.ts = Date.now(); chat.push(m); if (chat.length > 300) chat.shift(); }
 const tw = { id: secrets.twitchClientId, token: secrets.twitchBotToken, user: secrets.twitchUserId, login: settings.twitchChannel };
-async function helix(method, pathQ, body) {
+async function helix(method, pathQ, body, retry = true) {
   const r = await fetch('https://api.twitch.tv/helix/' + pathQ, { method, headers: { 'Client-Id': tw.id, Authorization: 'Bearer ' + tw.token, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  // Token renewed on disk since (scripts/Refresh-TwitchToken.ps1, hourly): use the new one.
+  if (r.status === 401 && retry) {
+    const s = readJson(`${ROOT}/secrets.json`);
+    if (s.twitchBotToken && s.twitchBotToken !== tw.token) { tw.token = secrets.twitchBotToken = s.twitchBotToken; return helix(method, pathQ, body, false); }
+  }
   if (r.status === 204) return {};
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Twitch ${r.status}: ${j.message || r.statusText}`);

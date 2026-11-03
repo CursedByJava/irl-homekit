@@ -1,6 +1,7 @@
 # Keeps the NOALBS Twitch chat token alive. Run hourly by the watchdog.
 # Twitch chat tokens expire after a few hours; NOALBS cannot refresh them itself, so this does it through the
-# TwitchTokenGenerator refresh API with the refresh token saved by Set-TwitchBotToken.ps1, then restarts NOALBS.
+# TwitchTokenGenerator refresh API with the refresh token saved by Set-TwitchBotToken.ps1 (or through Twitch itself
+# for a Connect-Twitch.ps1 sign-in), then restarts NOALBS. The dashboard picks up the new token by itself.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $secretsFile = "$root\secrets.json"
@@ -20,7 +21,10 @@ try {
 }
 
 try {
-    $r = Invoke-RestMethod "https://twitchtokengenerator.com/api/refresh/$($s.twitchBotRefresh)" -TimeoutSec 30
+    # Signed in with "Connect Twitch" (IRL Homekit's public Twitch app): Twitch renews it directly, no secret needed.
+    $r = if ($s.twitchAuth -eq 'device') {
+        Invoke-RestMethod 'https://id.twitch.tv/oauth2/token' -Method Post -TimeoutSec 30 -Body @{ grant_type = 'refresh_token'; refresh_token = $s.twitchBotRefresh; client_id = $s.twitchClientId }
+    } else { Invoke-RestMethod "https://twitchtokengenerator.com/api/refresh/$($s.twitchBotRefresh)" -TimeoutSec 30 }
 } catch { Log "refresh request failed: $($_.Exception.Message)"; exit 1 }
 $token = if ($r.token) { $r.token } else { $r.access_token }
 $refresh = if ($r.refresh) { $r.refresh } else { $r.refresh_token }

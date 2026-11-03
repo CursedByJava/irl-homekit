@@ -64,7 +64,6 @@ $tools = [ordered]@{
     'Status'            = @('Status-IRLHomekit', "What's running, is the phone connected, your phone settings")
     'Update scenes'     = @('Update-IRLScenes', 'Rebuild the IRL scenes after you change your normal OBS scenes')
     'Import from OBS'   = @('Import-ObsSettings', 'Copy profiles, scene collections, settings and plugins from your regular OBS')
-    'Twitch chat token' = @('Set-TwitchBotToken', 'Save the Twitch token for chat commands')
     'Set up remote dashboard' = @('Setup-RemoteDashboard', 'Reach your dashboard from your phone anywhere: free DuckDNS name or your own domain, with checks')
     'Change login'      = @('Set-DashboardLogin', 'Change the dashboard and Studio username or password')
     'Check for updates' = @('Update-IRLHomekit', 'See if there is a newer IRL Homekit and install it')
@@ -74,7 +73,9 @@ $tools = [ordered]@{
 foreach ($name in $tools.Keys) {
     New-Link (Join-Path $folder "IRL Homekit - $name.lnk") 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$InstallDir\scripts\$($tools[$name][0]).ps1`"" $tools[$name][1]
 }
-# A small window, no console.
+# Small windows, no console.
+New-Link (Join-Path $folder 'IRL Homekit - Connect Twitch.lnk') 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Connect-Twitch.ps1`"" `
+    'Sign in with Twitch: stream key, chat commands, Studio and clips in one step' -Minimized
 New-Link (Join-Path $folder 'IRL Homekit - Dashboard address.lnk') 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Show-DashboardAddress.ps1`"" `
     'Where your dashboard is, with Copy and Open buttons, to get it onto your phone' -Minimized
 
@@ -82,7 +83,7 @@ New-Link (Join-Path $folder 'IRL Homekit - Dashboard address.lnk') 'powershell.e
 foreach ($name in 'Status', 'Pause', 'Resume', 'Update scenes', 'Twitch chat token', 'Change login') {
     $old = Join-Path $desktop "IRL Homekit - $name.lnk"; if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force }
 }
-foreach ($name in 'Pause', 'Resume') {
+foreach ($name in 'Pause', 'Resume', 'Twitch chat token') {   # 'Twitch chat token' is now 'Connect Twitch'
     $old = Join-Path $folder "IRL Homekit - $name.lnk"; if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force }
 }
 $on = (Get-ScheduledTask -TaskName $signinTask).State -ne 'Disabled'

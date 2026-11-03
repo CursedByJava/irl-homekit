@@ -307,7 +307,8 @@ It only connects to:
 - **DuckDNS** (duckdns.org): only if you use a DuckDNS name, to keep it pointed at your PC or relay.
 - **Let's Encrypt**: only with the remote dashboard, for its HTTPS certificate (through Caddy).
 - **Twitch, Kick, YouTube / Google**: only for the platforms you connect in Studio, to show live status, chat and
-  titles; and TwitchTokenGenerator (twitchtokengenerator.com) to refresh the Twitch chat token if you set it up.
+  titles; Twitch sign-in (id.twitch.tv) if you use Connect Twitch; and TwitchTokenGenerator (twitchtokengenerator.com)
+  only if you made a Twitch token there by hand.
 - **Your home router**: to open IRL Homekit's ports (UPnP / NAT-PMP). This stays inside your home network.
 - **Your phone and your relay VM**: the stream itself.
 

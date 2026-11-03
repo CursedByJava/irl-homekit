@@ -12,7 +12,7 @@ Start with **IRL Homekit - Status** (Start menu) and the dashboard's *Home PC* c
 | Never switches to LIVE, NOALBS log silent | OBS WebSocket off or wrong password | OBS → *Tools → WebSocket Server Settings*: enabled, port 4455, password = `obsWebsocketPassword` in `secrets.json` |
 | Dashboard shows "OBS offline" | OBS closed or crashed | The watchdog restarts it within ~30 s; if it keeps crashing, check third-party OBS plugins |
 | `https://your-domain` doesn't load | DNS not pointing at you, or ports 80/443 not forwarded | `nslookup your-domain` must show your public IP; `logs\caddy.log` shows certificate errors; setup steps in [DOMAIN.md](DOMAIN.md) |
-| Chat commands don't answer | No bot token, or token revoked | Run the *Twitch chat token* shortcut again |
+| Chat commands don't answer | No bot token, or token revoked | Run the *Connect Twitch* shortcut again |
 | Kick/YouTube don't start | Target disabled or key missing | OBS → *Multiple output* dock → edit target → key + *enabled* |
 | PC slept / rebooted and nothing came back | Auto sign-in off | `netplwiz` → untick password requirement |
 

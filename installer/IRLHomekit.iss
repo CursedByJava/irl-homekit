@@ -81,6 +81,7 @@ ClickFinish=Click Finish to close Setup.
 Source: "..\*"; Excludes: ".git,.github,\installer\Output,\installer\images,\docs\images"; DestDir: "{tmp}\src"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; Needed before the pages are shown.
 Source: "Get-SetupInfo.ps1"; Flags: dontcopy
+Source: "..\scripts\Connect-Twitch.ps1"; Flags: dontcopy
 Source: "..\templates\relay-vps.sh"; Flags: dontcopy
 
 [Run]
@@ -107,6 +108,8 @@ var
   ChannelsPage, CustomPage: TWizardPage;
   TwitchEdit, KickEdit, YoutubeEdit, CustomNameEdit, CustomServerEdit, CustomKeyEdit: TNewEdit;
   CustomKeyHint: TNewStaticText;
+  TwitchStatus: TNewStaticText;
+  TwitchSignedIn: Boolean;
   ObsPage: TWizardPage;
   CollectionCombo, ProfileCombo: TNewComboBox;
   ImportObsCheck: TNewCheckBox;
@@ -424,7 +427,36 @@ procedure OpenRelayGuide(Sender: TObject); begin OpenUrl(RelayGuideUrl); end;
 procedure OpenDuckDns(Sender: TObject); begin OpenUrl(DuckDnsUrl); end;
 // Where each platform shows your name (Twitch and Kick put it in the address once you're signed in; YouTube shows
 // the channel ID with a copy button).
-procedure OpenTwitch(Sender: TObject); begin OpenUrl('https://dashboard.twitch.tv/'); end;
+// Sign in with Twitch (scripts\Connect-Twitch.ps1): a small window shows a code and Twitch opens in the browser.
+// The result (tokens, stream key) stays in a file in Setup's temp folder until install.ps1 uses and deletes it.
+procedure TwitchSignIn(Sender: TObject);
+var
+  Code: Integer;
+  Login, Err: AnsiString;
+  OutFile: String;
+begin
+  OutFile := ExpandConstant('{tmp}\twitch-auth.json');
+  ExtractTemporaryFile('Connect-Twitch.ps1');
+  DeleteFile(OutFile); DeleteFile(OutFile + '.login'); DeleteFile(OutFile + '.error');
+  Code := -1;
+  WizardForm.Enabled := False;
+  try
+    Exec(PowerShellExe, '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + ExpandConstant('{tmp}\Connect-Twitch.ps1') +
+      '" -OutFile "' + OutFile + '"', '', SW_SHOWNORMAL, ewWaitUntilTerminated, Code);
+  finally
+    WizardForm.Enabled := True;
+  end;
+  if (Code = 0) and LoadStringFromFile(OutFile + '.login', Login) then
+  begin
+    TwitchSignedIn := True;
+    TwitchEdit.Text := Trim(String(Login));
+    TwitchStatus.Caption := 'Signed in. Your stream key and chat commands get set up for you.';
+    TwitchStatus.Font.Color := ClrKick;
+  end
+  else if LoadStringFromFile(OutFile + '.error', Err) then
+    MsgBox('Couldn''t sign in with Twitch: ' + String(Err) + #13#10#13#10 +
+      'You can type your Twitch name instead, and sign in later: Start menu > IRL Homekit - Connect Twitch.', mbError, MB_OK);
+end;
 procedure OpenKick(Sender: TObject); begin OpenUrl('https://kick.com/dashboard'); end;
 procedure OpenYoutube(Sender: TObject); begin OpenUrl('https://www.youtube.com/account_advanced'); end;
 
@@ -489,11 +521,12 @@ begin
   ChannelsPage := CreateCustomPage(wpSelectDir, 'Your channels', 'All optional: skip any of them and add them later by running Setup again.');
   Y := 0;
   NewTitle(ChannelsPage.Surface, Y, 'Twitch', ClrTwitch);
-  NewLink(ChannelsPage.Surface, ScaleX(70), Y, 'Open my Twitch', @OpenTwitch);
   TwitchEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
   Hint(TwitchEdit, 'your Twitch name');
   TwitchEdit.Text := InfoValue('prev', 'twitchChannel');
-  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Chat commands (!start, !stop) and Studio.');
+  NewButton(ChannelsPage, ScaleX(252), Y + ScaleY(15), ScaleX(140), 'Sign in with Twitch', @TwitchSignIn);
+  TwitchStatus := NewNote(ChannelsPage.Surface, ScaleX(400), Y + ScaleY(13), ChannelsPage.SurfaceWidth - ScaleX(400),
+    'Brings in your stream key and turns on chat commands.');
   Y := Y + ScaleY(54);
   NewTitle(ChannelsPage.Surface, Y, 'Kick', ClrKick);
   NewLink(ChannelsPage.Surface, ScaleX(70), Y, 'Open my Kick', @OpenKick);
@@ -510,7 +543,7 @@ begin
   NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Paste the link from your browser.');
   Y := Y + ScaleY(58);
   NewNote(ChannelsPage.Surface, 0, Y, ChannelsPage.SurfaceWidth,
-    'Stream keys go into the IRL Homekit OBS later. Chat, titles and viewers connect in Studio (its Connect buttons).');
+    'Signing in with Twitch puts your Twitch stream key in for you. Kick and YouTube keys go into the IRL Homekit OBS later; their chat and titles connect in Studio (its Connect buttons).');
   NewLink(ChannelsPage.Surface, 0, ChannelsPage.SurfaceHeight - ScaleY(16), 'Skip for now', @SkipChannels);
 
   // Your own extra destination: any RTMP server, streamed to alongside the others.
@@ -1015,6 +1048,8 @@ begin
   if ChangingNetwork and (RemotePage.SelectedValueIndex = 0) and (Trim(DuckTokenEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_DUCKDNS_TOKEN', Trim(DuckTokenEdit.Text));
   SetEnvironmentVariable('IRLHK_RELAY_TOKEN', RelayToken);
   if ChangingChannels and (Trim(CustomKeyEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_CUSTOM_KEY', Trim(CustomKeyEdit.Text));
+  if ChangingChannels and TwitchSignedIn and FileExists(ExpandConstant('{tmp}\twitch-auth.json')) then
+    SetEnvironmentVariable('IRLHK_TWITCH_AUTH', ExpandConstant('{tmp}\twitch-auth.json'));
 
   WizardForm.ProgressGauge.Min := 0;
   WizardForm.ProgressGauge.Max := 100;

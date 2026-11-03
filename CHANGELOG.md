@@ -12,6 +12,11 @@ is what the built-in update checker reads.
 ## [Unreleased]
 
 ### Added
+- **Sign in with Twitch.** Setup's channels page (and Start menu → *IRL Homekit - Connect Twitch*) signs you in with
+  Twitch in one step: a small window shows a code, Twitch opens in your browser, you click *Authorize*. IRL Homekit
+  then has your Twitch stream key in its OBS, chat commands on, Studio's Twitch chat, title and category working, and
+  clips on BRB playing as video, and it renews the sign-in by itself. No more TwitchTokenGenerator, tokens to paste
+  or developer accounts. (A token you made by hand before keeps working.)
 - **Clips on Be Right Back.** Switch on *Play clips on BRB* on the dashboard (new *Clips* card) and, when your
   connection drops, the BRB scene plays your past Twitch clips in random order, with a "reconnecting" banner on top
   and the clip's title and who clipped it. Pick how far back (week, month, year, all time). It uses Twitch's

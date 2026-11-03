@@ -30,9 +30,9 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
 4. **Kick / YouTube (optional, free multistream)**: in the IRL Homekit OBS → *Docks → Multiple output* → edit **Kick** / **YouTube**,
    paste the server + stream key, tick **enabled**. Leave *sync start* off: IRL Homekit starts and stops them with the
    main stream, following the dashboard's **Stream to** switches (switch any platform off to skip it).
-5. **Twitch chat commands (optional)**: https://twitchtokengenerator.com → enable only `chat:read` + `chat:edit` →
-   *Generate Token* → authorize → solve the CAPTCHA → Start menu →
-   **"IRL Homekit - Twitch chat token"** and paste the Access + Refresh token.
+5. **Twitch chat commands**: if you didn't sign in with Twitch in Setup, Start menu → **"IRL Homekit - Connect Twitch"**
+   → check the code → **Authorize**. That also puts your Twitch stream key into the IRL Homekit OBS.
+   (Sign out any time: twitch.tv → Settings → Connections → IRL Homekit.)
 6. **Self-test**: `powershell -ExecutionPolicy Bypass -File {{INSTALL_DIR}}\tools\Test-IRLHomekit.ps1`
 
 ## 2. Phone — IRL Pro (Android)
@@ -105,6 +105,6 @@ Signal rules: under **1000 kbps** → *IRL LOW* (banner), under **300 kbps** or 
 
 **Open / close:** the **IRL Homekit** desktop icon opens it; closing its OBS window stops everything. It opens by itself
 when you sign in (turn off on the dashboard: Home PC → Start with Windows). Start menu folder *IRL Homekit*:
-**Status**, **Update scenes**, **Import from OBS**, **Twitch chat token**, **Change login**, **Check for updates**,
+**Status**, **Update scenes**, **Import from OBS**, **Connect Twitch**, **Dashboard address**, **Change login**, **Check for updates**,
 **Save diagnostics** (for bug reports), **Uninstall**. IRL Homekit also offers updates by itself when you open it. Logs: `{{INSTALL_DIR}}\logs`. Your public IP today: `{{PUBLIC_IP}}`. If it changes, the Status shortcut tells you what to update (nothing, if you use
 a DuckDNS name with its token, see docs/DOMAIN.md in the repo).

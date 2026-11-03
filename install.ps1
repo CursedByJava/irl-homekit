@@ -93,6 +93,9 @@ function New-Secret([int]$n) {
 }
 # Secrets from Setup.exe (environment, so they never show up in the process list).
 if (-not $DuckDnsToken -and $env:IRLHK_DUCKDNS_TOKEN) { $DuckDnsToken = $env:IRLHK_DUCKDNS_TOKEN }
+# Signed in with Twitch in Setup.exe (scripts\Connect-Twitch.ps1): the path of the result file; used in step 5.
+$twitchAuth = if ($env:IRLHK_TWITCH_AUTH -and (Test-Path -LiteralPath $env:IRLHK_TWITCH_AUTH)) { $env:IRLHK_TWITCH_AUTH } else { '' }
+if ($twitchAuth) { $TwitchChannel = (Get-Content -LiteralPath $twitchAuth -Raw | ConvertFrom-Json).login }
 # The relay's address as an IP (DuckDNS and DNS records need one, even if you entered a name).
 function Resolve-RelayIp($h) {
     if (-not $h) { return '' }
@@ -418,6 +421,8 @@ $settings = [ordered]@{
     studioDomain = $studioDomain; duckdnsName = $DuckDnsName; relayHost = $RelayHost; portMap = $PortMap; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
     streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true; custom = $true } })   # dashboard's "Stream to" switches
 }
+if ($prev.clips) { $settings.clips = $prev.clips }   # dashboard's Clips card
+
 Write-Utf8 "$InstallDir\settings.json" ($settings | ConvertTo-Json -Depth 5)
 
 # ------------------------------------------------------------------ 3. MediaMTX
@@ -570,6 +575,8 @@ Write-Utf8 $mr ($mrCfg | ConvertTo-Json -Depth 10)
 
 & "$repo\scripts\New-IRLScenes.ps1" -Name $ObsName -BaseCollection $BaseCollection -ObsConfigDir $ObsConfigDir -BaseConfigDir $BaseObsConfigDir `
     -OverlayDir "$InstallDir\overlays" -OverlaySources $OverlaySources -BrbBackground $BrbBackground -Force
+# Twitch sign-in from Setup.exe: chat token, channel ID and stream key (into the profile written above).
+if ($twitchAuth) { & "$InstallDir\scripts\Connect-Twitch.ps1" -InstallDir $InstallDir -Apply $twitchAuth }
 
 $wsCfg = Join-Path $ObsConfigDir 'plugin_config\obs-websocket\config.json'
 New-Item -ItemType Directory -Force (Split-Path $wsCfg) | Out-Null
