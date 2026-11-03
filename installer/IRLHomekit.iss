@@ -85,7 +85,7 @@ Source: "..\scripts\Connect-Twitch.ps1"; Flags: dontcopy
 Source: "..\templates\relay-vps.sh"; Flags: dontcopy
 
 [Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\Show-PhoneQr.ps1"""; Description: "Show a QR code to set up my phone (scan it with the phone's camera)"; Flags: postinstall nowait skipifsilent runasoriginaluser runhidden; Check: InstallSucceeded and HasRemoteDashboard
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\Show-PhoneQr.ps1"""; Description: "Show a QR code to set up my phone (scan it with the phone's camera)"; Flags: postinstall nowait skipifsilent runasoriginaluser runhidden; Check: InstallSucceeded and HasRemoteDashboard and NoQrOnPage
 Filename: "{win}\notepad.exe"; Parameters: """{code:GetGuidePath}"""; Description: "Open my phone settings and the last steps (PHONE-SETUP.md)"; Flags: postinstall nowait skipifsilent runasoriginaluser; Check: InstallSucceeded
 Filename: "{code:GetDashboardUrl}"; Description: "Open the dashboard"; Flags: postinstall shellexec nowait skipifsilent runasoriginaluser unchecked; Check: InstallSucceeded
 
@@ -114,6 +114,10 @@ var
   CustomCheck: TNewCheckBox;
   MadePassword, MadeUser: String;
   CopyPasswordBtn, SaveLoginBtn: TNewButton;
+  QrImage: TBitmapImage;
+  QrLabel: TNewStaticText;
+  QrNewBtn: TNewButton;
+  QrStatus: String;
   ObsPage: TWizardPage;
   CollectionCombo, ProfileCombo: TNewComboBox;
   ImportObsCheck: TNewCheckBox;
@@ -367,6 +371,11 @@ begin
   Result := InstallOk;
 end;
 
+function NoQrOnPage: Boolean;
+begin
+  Result := not QrImage.Visible;
+end;
+
 // The QR code needs an address the phone can open (https://...), not "localhost".
 function HasRemoteDashboard: Boolean;
 begin
@@ -474,6 +483,32 @@ begin
     'Keep this file private. Change the password any time: Start menu > IRL Homekit - Change login.' + #13#10, False) then
     MsgBox('Saved: ' + FileName, mbInformation, MB_OK)
   else MsgBox('Couldn''t save it there. Try another folder.', mbError, MB_OK);
+end;
+
+// The phone QR code on the last page (scripts\New-PhoneQr.ps1): waits for the dashboard and its HTTPS certificate,
+// then draws a one-time sign-in link (it works once, for 10 minutes).
+function MakePhoneQr(WaitSeconds: Integer): Boolean;
+var
+  Code: Integer;
+  OutFile: String;
+  Status: AnsiString;
+begin
+  OutFile := ExpandConstant('{tmp}\phone-qr.bmp');
+  Exec(PowerShellExe, '-NoProfile -ExecutionPolicy Bypass -File "' + RemoveBackslashUnlessRoot(WizardDirValue) + '\scripts\New-PhoneQr.ps1" -OutFile "' +
+    OutFile + '" -WaitSeconds ' + IntToStr(WaitSeconds), '', SW_HIDE, ewWaitUntilTerminated, Code);
+  if LoadStringFromFile(OutFile + '.txt', Status) then QrStatus := Trim(String(Status)) else QrStatus := 'error';
+  Result := (QrStatus = 'ok') and FileExists(OutFile);
+  if Result then
+  begin
+    QrImage.Bitmap.LoadFromFile(OutFile);
+    QrImage.Visible := True; QrLabel.Visible := True; QrNewBtn.Visible := True;
+  end;
+end;
+
+procedure QrNewClick(Sender: TObject);
+begin
+  if not MakePhoneQr(20) then
+    MsgBox('Couldn''t make a new code right now. Start menu > IRL Homekit - Connect my phone shows one too.', mbInformation, MB_OK);
 end;
 
 procedure OpenOracle(Sender: TObject); begin OpenUrl(OracleUrl); end;
@@ -716,14 +751,16 @@ begin
   // Remote dashboard.
   RemotePage := CreateInputOptionPage(RelayPage.ID, 'Dashboard on your phone',
     'Use the dashboard on your phone, from anywhere?',
-    'It needs a web address, like yourname.duckdns.org, that you type into your phone''s browser. You get a free one in about 2 minutes.', True, False);
-  RemotePage.Add('Yes, with a free address like yourname.duckdns.org (recommended)');
+    'Not sure? Keep the first one: nothing to sign up for. At the end, a QR code puts it on your phone in one scan.', True, False);
+  RemotePage.Add('Yes, no account needed (recommended): its address is your home''s internet address, like https://203.0.113.7, set up by itself');
+  RemotePage.Add('Yes, with a free name like yourname.duckdns.org (sign in at duckdns.org; keeps one address even if your home''s internet address changes)');
   RemotePage.Add('Yes, with a website address I already own, like irl.yourname.com');
   RemotePage.Add('Not now: only on this PC (add it later: Start menu > IRL Homekit - Set up remote dashboard)');
   Prev := InfoValue('prev', 'domain');
-  if InfoValue('prev', 'duckdnsName') <> '' then RemotePage.SelectedValueIndex := 0
-  else if Prev <> '' then RemotePage.SelectedValueIndex := 1
-  else if IsUpdate then RemotePage.SelectedValueIndex := 2
+  if InfoValue('prev', 'dashboardOnIp') <> '' then RemotePage.SelectedValueIndex := 0
+  else if InfoValue('prev', 'duckdnsName') <> '' then RemotePage.SelectedValueIndex := 1
+  else if Prev <> '' then RemotePage.SelectedValueIndex := 2
+  else if IsUpdate then RemotePage.SelectedValueIndex := 3
   else RemotePage.SelectedValueIndex := 0;
   if InfoValue('prev', 'relayHost') <> '' then NetworkPage.SelectedValueIndex := 1;
 
@@ -785,6 +822,17 @@ begin
   CopyPasswordBtn := NewButton(SummaryPage, 0, Y, ScaleX(130), 'Copy password', @CopyPasswordClick);
   SaveLoginBtn := NewButton(SummaryPage, ScaleX(138), Y, ScaleX(170), 'Save login to a file...', @SaveLoginClick);
   CopyPasswordBtn.Visible := False; SaveLoginBtn.Visible := False;
+  QrImage := TBitmapImage.Create(SummaryPage);
+  QrImage.Parent := SummaryPage.Surface;
+  QrImage.Width := ScaleX(176); QrImage.Height := ScaleX(176);
+  QrImage.Left := SummaryPage.SurfaceWidth - QrImage.Width;
+  QrImage.Top := SummaryPage.RichEditViewer.Top;
+  QrImage.Stretch := True; QrImage.Visible := False;
+  QrLabel := NewNote(SummaryPage.Surface, QrImage.Left, QrImage.Top + QrImage.Height + ScaleY(4), QrImage.Width,
+    'Scan this with your phone''s camera and tap the link. Works once, for 10 minutes.');
+  QrLabel.Visible := False;
+  QrNewBtn := NewButton(SummaryPage, QrImage.Left, QrLabel.Top + QrLabel.Height + ScaleY(4), QrImage.Width, 'New code', @QrNewClick);
+  QrNewBtn.Visible := False;
 end;
 
 procedure InitializeWizard;
@@ -854,7 +902,7 @@ begin
   else if PageID = LoginPage.ID then Result := InfoValue('prev', 'dashboardUser') <> ''
   else if (PageID = NetworkPage.ID) or (PageID = RemotePage.ID) then Result := not ChangingNetwork
   else if PageID = RelayPage.ID then Result := (not ChangingNetwork) or (NetworkPage.SelectedValueIndex <> 1)
-  else if PageID = RemoteDetailPage.ID then Result := (not ChangingNetwork) or (RemotePage.SelectedValueIndex = 2)
+  else if PageID = RemoteDetailPage.ID then Result := (not ChangingNetwork) or (RemotePage.SelectedValueIndex = 0) or (RemotePage.SelectedValueIndex = 3)
   else if PageID = SummaryPage.ID then Result := ResultLines.Count + InstallLog.Count = 0;
 end;
 
@@ -888,8 +936,8 @@ begin
   end
   else if CurPageID = RemoteDetailPage.ID then
   begin
-    DuckPanel.Visible := RemotePage.SelectedValueIndex = 0;
-    DomainPanel.Visible := RemotePage.SelectedValueIndex = 1;
+    DuckPanel.Visible := RemotePage.SelectedValueIndex = 1;
+    DomainPanel.Visible := RemotePage.SelectedValueIndex = 2;
     // A name suggestion from your Twitch name (DuckDNS names are first come, first served).
     if (DuckNameEdit.Text = '') and (Trim(TwitchEdit.Text) <> '') then DuckNameEdit.Text := Lowercase(Trim(TwitchEdit.Text)) + '-irl';
     if DuckPanel.Visible and (DuckTimer = 0) then DuckTimer := SetTimer(0, 0, 1000, CreateCallback(@DuckClipboardTick));
@@ -964,7 +1012,7 @@ begin
   end
   else if CurPageID = RemoteDetailPage.ID then
   begin
-    if RemotePage.SelectedValueIndex = 0 then
+    if RemotePage.SelectedValueIndex = 1 then
     begin
       S := Lowercase(Trim(DuckNameEdit.Text));
       StringChangeEx(S, '.duckdns.org', '', True);
@@ -1024,8 +1072,9 @@ begin
     else S := S + 'home router (ports opened automatically)';
     S := S + NewLine + 'Remote dashboard:' + NewLine + Space;
     case RemotePage.SelectedValueIndex of
-      0: S := S + 'https://' + DuckNameEdit.Text + '.duckdns.org';
-      1: S := S + 'https://' + DomainEdit.Text;
+      0: S := S + 'https://' + 'your home''s internet address (no account; shown at the end)';
+      1: S := S + 'https://' + DuckNameEdit.Text + '.duckdns.org';
+      2: S := S + 'https://' + DomainEdit.Text;
     else
       S := S + 'only on this PC (http://localhost:8090)';
     end;
@@ -1078,8 +1127,9 @@ begin
     if S <> '{' then S := S + ',';
     if NetworkPage.SelectedValueIndex = 1 then S := S + '"RelayHost":' + JsonStr(RelayHostEdit.Text) else S := S + '"RelayHost":"off"';
     case RemotePage.SelectedValueIndex of
-      0: S := S + ',"Domain":' + JsonStr(DuckNameEdit.Text + '.duckdns.org') + ',"DuckDnsName":' + JsonStr(DuckNameEdit.Text);
-      1: S := S + ',"Domain":' + JsonStr(DomainEdit.Text) + ',"DuckDnsName":"off"';
+      0: S := S + ',"Domain":"ip","DuckDnsName":"off"';
+      1: S := S + ',"Domain":' + JsonStr(DuckNameEdit.Text + '.duckdns.org') + ',"DuckDnsName":' + JsonStr(DuckNameEdit.Text);
+      2: S := S + ',"Domain":' + JsonStr(DomainEdit.Text) + ',"DuckDnsName":"off"';
     else
       S := S + ',"Domain":"off","DuckDnsName":"off"';
     end;
@@ -1119,7 +1169,7 @@ begin
   ResultFile := ExpandConstant('{tmp}\result.txt');
   // Secrets go in the environment, never on the command line.
   if (not ShouldSkipPage(LoginPage.ID)) and (not LoginGenerate.Checked) then SetEnvironmentVariable('IRLHK_DASHBOARD_PASSWORD', LoginPass.Text);
-  if ChangingNetwork and (RemotePage.SelectedValueIndex = 0) and (Trim(DuckTokenEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_DUCKDNS_TOKEN', Trim(DuckTokenEdit.Text));
+  if ChangingNetwork and (RemotePage.SelectedValueIndex = 1) and (Trim(DuckTokenEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_DUCKDNS_TOKEN', Trim(DuckTokenEdit.Text));
   SetEnvironmentVariable('IRLHK_RELAY_TOKEN', RelayToken);
   if ChangingChannels and (Trim(CustomKeyEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_CUSTOM_KEY', Trim(CustomKeyEdit.Text));
   if ChangingChannels and TwitchSignedIn and FileExists(ExpandConstant('{tmp}\twitch-auth.json')) then
@@ -1193,7 +1243,18 @@ begin
   end
   else S := S + '  Password: the one you chose' + NL;
   S := S + NL + 'PHONE (IRL Pro / Moblin / BELABOX)' + NL;
-  if HasRemoteDashboard then
+  if QrImage.Visible then
+  begin
+    // Room for the code on the right.
+    SummaryPage.RichEditViewer.Width := QrImage.Left - ScaleX(10);
+    S := S + '  NEXT: scan the QR code on the right with your phone''s camera and tap the link.' + NL +
+      '  Your phone opens the dashboard signed in; tap Open in IRL Pro there and IRL Pro is set up.' + NL;
+  end
+  else if HasRemoteDashboard and (QrStatus = 'nocert') then
+    S := S + '  Your dashboard''s HTTPS certificate isn''t ready yet: usually the internet can''t reach this PC on ports' + NL +
+      '  80/443 (router, or carrier-grade NAT). Start menu > IRL Homekit - Set up remote dashboard checks it and says what to do.' + NL +
+      '  Once it works: Start menu > IRL Homekit - Connect my phone shows the QR code.' + NL
+  else if HasRemoteDashboard then
     S := S + '  NEXT: click Finish (with "Show a QR code" ticked) and scan the code with your phone''s camera.' + NL +
       '  Your phone opens the dashboard signed in; tap Open in IRL Pro there and IRL Pro is set up.' + NL;
   S := S + '  All your phone settings are also in ' + GuidePath + NL +
@@ -1229,6 +1290,15 @@ begin
   if CurStep = ssPostInstall then
   begin
     RunInstall;
+    DashboardUrl := ResultValue('dashboardUrl');
+    if Pos(' ', DashboardUrl) > 0 then DashboardUrl := Copy(DashboardUrl, 1, Pos(' ', DashboardUrl) - 1);
+    if InstallOk and HasRemoteDashboard then
+    begin
+      WizardForm.StatusLabel.Caption := 'Getting your dashboard ready for your phone (its free HTTPS certificate, up to 2 minutes)...';
+      WizardForm.FilenameLabel.Caption := 'IRL Homekit is starting; the code for your phone comes next.';
+      WizardForm.ProgressGauge.Position := WizardForm.ProgressGauge.Max;
+      MakePhoneQr(120);
+    end;
     ShowSummary;
   end;
 end;

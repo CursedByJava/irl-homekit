@@ -203,6 +203,28 @@ function Update-DuckDns {
     if ($r -ne $script:lastDuck) { Log "DuckDNS update for $($settings.duckdnsName).duckdns.org: $r"; $script:lastDuck = $r }
 }
 
+# No-account dashboard address (settings.json "dashboardOnIp", scripts\Write-Caddyfile.ps1): it's this home's (or the
+# relay's) internet address, so when the internet provider changes that, the address moves with it: new web server
+# settings (its certificate comes by itself), the dashboard restarted, and the phone guide updated. Phones then need
+# the new address: Start menu > IRL Homekit - Connect my phone shows it as a QR code.
+function Update-DashboardIp {
+    $now = if ($settings.relayHost) { Get-RelayIp } else { try { "$(Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 10)".Trim() } catch { '' } }
+    if ($now -notmatch '^\d{1,3}(\.\d{1,3}){3}$' -or $now -eq "$($settings.domain)") { return }
+    $old = $settings.domain
+    $disk = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
+    $disk | Add-Member -Force domain $now
+    [IO.File]::WriteAllText("$root\settings.json", ($disk | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
+    $script:settings = $disk
+    try { & "$root\scripts\Write-Caddyfile.ps1" -InstallDir $root -Reload } catch { Log "couldn't update the web server for the new address: $_" }
+    $guide = "$root\PHONE-SETUP.md"
+    if (Test-Path $guide) {
+        $g = [IO.File]::ReadAllText($guide).Replace("https://$old", "https://$now")
+        [IO.File]::WriteAllText($guide, $g, (New-Object Text.UTF8Encoding $false))
+    }
+    Add-Content "$logs\restart.request" 'dashboard'
+    Log "your internet address changed from $old to $now, so the dashboard is now at https://$now. On your phone, scan a new code: Start menu > IRL Homekit - Connect my phone"
+}
+
 Log $(if ($Background) { 'IRL Homekit started at sign-in' } else { 'IRL Homekit opened' })
 if (-not (Get-IrlObs)) { Start-IrlObs -Minimized:$Background } elseif (-not $Background) { Show-IrlObs }
 # Look for a newer IRL Homekit (at most once a day); if there is one, Windows shows an "Update now?" box.
@@ -213,6 +235,7 @@ if (-not (Test-Path $stamp) -or (Get-Item $stamp).LastWriteTime -lt (Get-Date).A
 }
 $nextTokenCheck = Get-Date
 $nextDuck = Get-Date
+$nextIpCheck = Get-Date
 $nextPortMap = Get-Date
 $wsPort = if ($settings.obsWebsocketPort) { $settings.obsWebsocketPort } else { 4455 }
 $noWsSince = $null
@@ -239,6 +262,10 @@ while ($true) {
     if ($settings.duckdnsName -and $secrets.duckdnsToken -and (Get-Date) -ge $nextDuck) {
         $nextDuck = (Get-Date).AddMinutes(5)
         Update-DuckDns
+    }
+    if ($settings.dashboardOnIp -and (Get-Date) -ge $nextIpCheck) {
+        $nextIpCheck = (Get-Date).AddMinutes(5)
+        Update-DashboardIp
     }
     # Router ports (scripts\Set-IRLPortMap.ps1): opened for 2 hours at a time, so renew them while the app runs.
     if (-not $settings.relayHost -and "$($settings.portMap)" -ne 'Off' -and (Get-Date) -ge $nextPortMap) {

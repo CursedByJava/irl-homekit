@@ -318,7 +318,7 @@ function dashboard() {
       $('remoteDot').className = 'status-dot ' + (!rm.domain ? '' : rm.ok ? 'ok' : rm.ok === false ? 'bad' : 'warn');
       $('remoteDesc').textContent = !rm.domain
         ? 'Off: this page only opens on the PC. To reach it from your phone anywhere, run "IRL Homekit - Set up remote dashboard" from the Start menu on the PC.'
-        : rm.ok ? 'Working at ' + rm.domain + ' and ' + rm.studio + ' (HTTPS).'
+        : rm.ok ? 'Working at ' + rm.domain + (rm.studio ? ' and ' + rm.studio : ' (Studio at ' + rm.domain + '/studio)') + ' (HTTPS).'
         : rm.problem + ' Then run "IRL Homekit - Set up remote dashboard" on the PC to check again.';
     }
     // The router isn't a program IRL Homekit restarts; its problem is explained on its own line below.

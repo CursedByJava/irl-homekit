@@ -15,7 +15,7 @@ function Add([string[]] $v) { $lines.Add((($v | ForEach-Object { "$_" -replace "
 if (Test-Path "$InstallDir\settings.json") {
     $prev = Get-Content "$InstallDir\settings.json" -Raw -Encoding UTF8 | ConvertFrom-Json
     Add 'installed', $(if (Test-Path "$InstallDir\VERSION") { (Get-Content "$InstallDir\VERSION" -Raw).Trim() } else { 'unknown' })
-    foreach ($k in 'twitchChannel', 'kickChannel', 'youtubeChannelId', 'domain', 'duckdnsName', 'relayHost', 'baseCollection', 'baseObsConfigDir') { if ($prev.$k) { Add 'prev', $k, $prev.$k } }
+    foreach ($k in 'twitchChannel', 'kickChannel', 'youtubeChannelId', 'domain', 'dashboardOnIp', 'duckdnsName', 'relayHost', 'baseCollection', 'baseObsConfigDir') { if ($prev.$k) { Add 'prev', $k, $prev.$k } }
     if ($prev.baseObsConfigDir) { $BaseObsConfigDir = $prev.baseObsConfigDir }
     # The custom stream destination (obs-multi-rtmp target 1003): its name and server; only whether a key is set.
     $mr = Join-Path $prev.obsConfigDir ('basic\profiles\' + ("$($prev.obsProfile)" -replace '[^A-Za-z0-9_\-]', '_') + '\obs-multi-rtmp.json')

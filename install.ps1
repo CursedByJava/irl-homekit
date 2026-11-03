@@ -248,12 +248,17 @@ if ($YoutubeChannelId -and $YoutubeChannelId -notmatch '^UC[\w-]{22}$') {
 # IRL Homekit is open, so it can check DNS, router ports and the HTTPS certificate for you.
 $setupRemote = $false
 if (-not $prev -and -not $Domain -and -not $NonInteractive) {
-    Info 'Remote dashboard: control IRL Homekit from your phone anywhere at https://your-name..., with free HTTPS.'
-    Info 'It needs a name: a free one from DuckDNS (2 minutes) or a domain you own. A guided setup runs at the end.'
-    $setupRemote = (Ask 'Set up the remote dashboard? (Y/n)' 'Y') -notmatch '^n'
+    Info 'Dashboard on your phone: control IRL Homekit from your phone anywhere, with free HTTPS.'
+    Info 'No account needed: it gets an address like https://203.0.113.7 by itself. A short guided setup runs at the end.'
+    $setupRemote = (Ask 'Set up the dashboard on your phone? (Y/n)' 'Y') -notmatch '^n'
 }
 $Domain = "$Domain".Trim().ToLower()
 if ($Domain -eq 'off') { $Domain = '' }   # Setup.exe: remote dashboard switched off
+# No account (-Domain ip): the dashboard's address is this home's internet address (or the relay's), with
+# Let's Encrypt's certificates for IP addresses. It's filled in below, once the internet address is known; an update
+# keeps the choice and takes the current address.
+$dashboardOnIp = ($Domain -eq 'ip') -or ([bool]$prev.dashboardOnIp -and $Domain -eq "$($prev.domain)")
+if ($dashboardOnIp) { $Domain = '' }
 if ($DuckDnsName -eq 'off') { $DuckDnsName = '' }   # Setup.exe: no DuckDNS name any more
 $oldSecrets = if (Test-Path "$InstallDir\secrets.json") { Get-Content "$InstallDir\secrets.json" -Raw | ConvertFrom-Json }
 if (-not $DuckDnsName -and $Domain -match '([a-z0-9-]+)\.duckdns\.org$') { $DuckDnsName = $Matches[1] }
@@ -408,6 +413,15 @@ if ($RelayHost -and -not $s.relayToken) { $s | Add-Member -Force relayToken (New
 $lan = (Get-NetIPConfiguration | Where-Object IPv4DefaultGateway | Select-Object -First 1).IPv4Address.IPAddress
 $public = try { (Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 10).Trim() } catch { '' }
 $s | Add-Member -Force lanIp $lan; $s | Add-Member -Force publicIp $public
+if ($dashboardOnIp) {
+    $Domain = if ($RelayHost) { Resolve-RelayIp $RelayHost } else { $public }
+    if (-not $Domain) {
+        $dashboardOnIp = $false
+        $m = "Couldn't find this $(if ($RelayHost) { 'relay''s' } else { 'home''s' }) internet address, so the dashboard is on this PC only for now. Run Start menu > IRL Homekit - Set up remote dashboard once the internet works."
+        $result.warnings += $m; Write-Warning $m
+    }
+}
+$studioUrl = if (-not $Domain) { 'http://localhost:8090/studio (on this PC only)' } elseif ($studioDomain) { "https://$studioDomain" } else { "https://$Domain/studio" }
 $s | ConvertTo-Json | Set-Content -Encoding UTF8 $secretsFile
 Info "secrets.json: $secretsFile (keep it private)"
 
@@ -419,7 +433,7 @@ $settings = [ordered]@{
     obsDir = $ObsDir; obsConfigDir = $ObsConfigDir; baseObsConfigDir = $BaseObsConfigDir; obsWebsocketPort = $ObsWsPort; obsProfile = $ObsName; obsCollection = $ObsName; domain = $Domain; twitchChannel = $TwitchChannel.ToLower()
     phoneInputs = @('IRL Phone (Bonded)', 'IRL Phone (Backup)'); overlayInputs = @($OverlaySources); audioInputs = $audio
     autoScenes = @('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)')
-    studioDomain = $studioDomain; duckdnsName = $DuckDnsName; relayHost = $RelayHost; portMap = $PortMap; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
+    studioDomain = $studioDomain; dashboardOnIp = $dashboardOnIp; duckdnsName = $DuckDnsName; relayHost = $RelayHost; portMap = $PortMap; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
     streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true; custom = $true } })   # dashboard's "Stream to" switches
 }
 if ($prev.clips) { $settings.clips = $prev.clips }   # dashboard's Clips card
@@ -613,13 +627,13 @@ if ($RelayHost) {
     Info "relay: phone and dashboard traffic arrives through $RelayHost (no router port forwarding needed)"
     if (-not $relayIp) { $result.warnings += "Couldn't look up the relay server '$RelayHost'. Check the address."; Write-Warning "Couldn't look up '$RelayHost'." }
 }
-# Behind the relay, dashboard visitors arrive from the relay's tunnel address (10.66.66.1), with their own address in
-# a PROXY header added by the relay (sign-in limits are per visitor).
-$caddyServers = if ($RelayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 10.66.66.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
 & "$InstallDir\scripts\Set-DashboardLogin.ps1" -InstallDir $InstallDir -Username $s.dashboardUser -Password $s.dashboardPassword -Quiet
 Info "dashboard login: user $($s.dashboardUser)"
-if ($Domain) {
-    Write-Utf8 "$InstallDir\caddy\Caddyfile" ([IO.File]::ReadAllText("$repo\templates\Caddyfile").Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$Domain, $studioDomain").Replace('{{SERVERS}}', $caddyServers))
+# The web server's settings (caddy\Caddyfile) for the address in settings.json, or none (scripts\Write-Caddyfile.ps1).
+& "$InstallDir\scripts\Write-Caddyfile.ps1" -InstallDir $InstallDir
+if ($Domain -and $dashboardOnIp) {
+    Info "HTTPS dashboard: https://$Domain, no account needed (a free certificate for $(if ($RelayHost) { 'your relay''s' } else { 'your home''s' }) internet address, renewed by itself; IRL Homekit follows it if it changes). Studio: $studioUrl"
+} elseif ($Domain) {
     if ($DuckDnsName -and $s.duckdnsToken) {
         # Point the DuckDNS name at this PC now, so the HTTPS certificate can be issued on first start.
         # With a relay, the name points at the relay (that's where phones and browsers connect), not at this PC.
@@ -693,7 +707,7 @@ $phonePort = { param($proto, $port) $m = @($portMapResult.ports) | Where-Object 
 foreach ($kv in ([ordered]@{ '{{PORT_BONDED}}' = (& $phonePort 'UDP' 5000); '{{PORT_SRT}}' = (& $phonePort 'UDP' 8890); '{{PORT_RTMP}}' = (& $phonePort 'TCP' 1935) }).GetEnumerator()) { $guide = $guide.Replace($kv.Key, $kv.Value) }
 foreach ($kv in ([ordered]@{ '{{PUBLIC_IP}}' = $(if ($public) { $public } else { '<your public IP>' }); '{{LAN_IP}}' = $lan; '{{GOIRL_PASSPHRASE}}' = $s.goirlPassphrase
     '{{MEDIAMTX_USER}}' = $s.mediamtxUser; '{{MEDIAMTX_PASS}}' = $s.mediamtxPass; '{{DASHBOARD_URL}}' = $dash; '{{DASHBOARD_USER}}' = $s.dashboardUser
-    '{{STUDIO_URL}}' = $(if ($Domain) { "https://$studioDomain" } else { 'http://localhost:8090/studio (on this PC only)' })
+    '{{STUDIO_URL}}' = $studioUrl
     '{{PHONE_HOST}}' = $(if ($DuckDnsName -and $s.duckdnsToken) { "$DuckDnsName.duckdns.org" } elseif ($RelayHost) { $RelayHost } elseif ($public) { $public } else { '<your public IP>' })
     '{{RELAY_HOST}}' = $RelayHost
     '{{ROUTER_PORTS}}' = $(if ($portMapResult.ok -and @($portMapResult.ports | Where-Object { $_.manual })) { "Nothing to do. $($portMapResult.message) IRL Homekit keeps the others open while it runs. The ports:" }
@@ -732,7 +746,7 @@ Write-Host "    Open it any time from the Start menu or the desktop icon 'IRL Ho
 Write-Host "    Opens by itself when you sign in: $AutoStart (change it on the dashboard: Home PC > Start with Windows)."
 Write-Host "`nSign in to your dashboard:" -ForegroundColor Cyan
 Write-Host "    Dashboard  $dash"
-if ($Domain) { Write-Host "    Studio     https://$studioDomain" }
+if ($Domain) { Write-Host "    Studio     $studioUrl" }
 Write-Host "    Username   $($s.dashboardUser)"
 Write-Host "    Password   $(if ($login -and $login.Generated) { $s.dashboardPassword } elseif ($login) { '(the one you chose)' } else { '(unchanged)' })"
 Write-Host "    Change it any time: Start menu > IRL Homekit - Change login."
@@ -755,7 +769,7 @@ if (-not $ResultFile -and -not $NonInteractive -and -not $SkipSystem) {
 if ($ResultFile) {
     $result.ok = $true
     $result.installDir = $InstallDir; $result.guide = "$InstallDir\PHONE-SETUP.md"; $result.autoStart = $AutoStart
-    $result.dashboardUrl = $dash; $result.studioUrl = $(if ($Domain) { "https://$studioDomain" } else { '' })
+    $result.dashboardUrl = $dash; $result.studioUrl = $(if ($Domain) { $studioUrl } else { '' })
     $result.username = $s.dashboardUser
     $result.password = $(if ($login -and $login.Generated) { $s.dashboardPassword } else { '' })   # only one we made up
     $result.relayHost = $RelayHost; $result.relayConnected = $relayOk

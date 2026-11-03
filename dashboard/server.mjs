@@ -352,8 +352,11 @@ async function checkRemote() {
     // Names must point at the relay server when there is one (docs/RELAY.md), else at this PC's home IP.
     const ip = settings.relayHost ? await relayIp() : (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(8000) })).text()).trim();
     const where = settings.relayHost ? 'your relay' : 'your home IP';
+    // No account (settings.dashboardOnIp): the address is the IP itself, so there's no DNS to check. The app moves it
+    // within 5 minutes when the IP changes (scripts/Start-IRLHomekit.ps1).
+    if (settings.dashboardOnIp && settings.domain !== ip) { r.ok = false; r.problem = `${where} changed to ${ip}. IRL Homekit moves the dashboard there within 5 minutes; then scan a new QR code on your phone.`; }
     const resolver = new dns.Resolver(); resolver.setServers(['1.1.1.1', '8.8.8.8']);
-    for (const n of names) {
+    for (const n of settings.dashboardOnIp ? [] : names) {
       const got = await resolver.resolve4(n).catch(() => []);
       if (!got.includes(ip)) { r.ok = false; r.problem = got.length ? `${n} points to ${got[0]}, but ${where} is ${ip}. Update its DNS record.` : `${n} has no DNS record.`; break; }
     }

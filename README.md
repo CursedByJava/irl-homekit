@@ -84,8 +84,8 @@ Cost: $0/month. Uses your home upload (about 8 Mbps per platform). Like it? [Sup
   ports by itself (UPnP, on by default on most home routers), so there's usually nothing to set up. If the router
   doesn't do that, you forward the ports by hand ([ROUTER.md](docs/ROUTER.md)). If your provider shares one address
   between homes (carrier-grade NAT; Setup tells you), use a free relay server instead ([RELAY.md](docs/RELAY.md))
-- Optional, to reach the dashboard from your phone anywhere: a **free** name from [DuckDNS](https://www.duckdns.org) or a
-  domain you own (about $10/year). A guided setup does the rest: see [Remote dashboard](#remote-dashboard).
+- Optional, to reach the dashboard from your phone anywhere: nothing at all (it can use your home's internet address),
+  or a **free** name from [DuckDNS](https://www.duckdns.org) or a domain you own. See [Remote dashboard](#remote-dashboard).
 - Optional for the self-test: ffmpeg, `winget install Gyan.FFmpeg`
 
 Nothing else to install: IRL Homekit brings its own copy of Node.js (for the dashboard) if your PC doesn't have it.
@@ -204,14 +204,18 @@ Your regular OBS isn't touched. Router ports IRL Homekit opened itself are close
 hand, remove those forwards on your router (or delete the relay VM in Oracle Cloud if you used one).
 ## Remote dashboard
 
-Reach your dashboard and Studio from your phone anywhere at `https://your-name...`, with a free HTTPS certificate.
-Start menu → **IRL Homekit - Set up remote dashboard** (the installer offers it too) and pick one:
+Reach your dashboard and Studio from your phone anywhere, with a free HTTPS certificate.
+Start menu → **IRL Homekit - Set up remote dashboard** (Setup and the one-line install offer it too) and pick one:
 
 | Choice | You get | Cost | What you do |
 |---|---|---|---|
-| **1. Free DuckDNS name** (recommended) | `https://yourname.duckdns.org` | Free | Sign in at [duckdns.org](https://www.duckdns.org) (it opens for you), add a name, paste the token |
-| **2. A domain you own** | `https://irl.yourname.com` | ~$10/year ([cheap registrars](docs/DOMAIN.md#option-2-your-own-domain)) | Add the two DNS records it shows you (GoDaddy, Cloudflare, Namecheap and Porkbun steps included) |
-| **3. This PC only** | `http://localhost:8090` | Free | Nothing |
+| **1. No account** (recommended) | `https://203.0.113.7` (your home's internet address) | Free | Nothing: Let's Encrypt's certificates for IP addresses, set up and renewed by themselves. If your internet provider changes your address, IRL Homekit moves the dashboard with it; scan a new QR code once |
+| **2. Free DuckDNS name** | `https://yourname.duckdns.org` | Free | Sign in at [duckdns.org](https://www.duckdns.org) (it opens for you), add a name, click the token. One address that never changes |
+| **3. A domain you own** | `https://irl.yourname.com` | ~$10/year ([cheap registrars](docs/DOMAIN.md#option-2-your-own-domain)) | Add the two DNS records it shows you (GoDaddy, Cloudflare, Namecheap and Porkbun steps included) |
+| **4. This PC only** | `http://localhost:8090` | Free | Nothing |
+
+You never have to type the address: Start menu → **IRL Homekit - Connect my phone** shows a QR code that opens it on
+your phone, signed in.
 
 Then it sets up the web server and firewall and **checks everything for you**, with a plain fix for anything that
 isn't right yet:

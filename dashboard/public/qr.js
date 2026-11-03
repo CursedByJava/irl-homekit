@@ -122,13 +122,19 @@
     return p;
   }
 
-  window.irlQr = function (text, forceMask) {   // forceMask: for tests only
+  // The modules (true = dark), without the quiet zone. Also used by tools/qr-bmp.mjs for Setup's picture.
+  window.irlQrMatrix = function (text, forceMask) {   // forceMask: for tests only
     const { ver, codewords } = encode(text);
     let best = null, bestP = Infinity;
     for (let mask = 0; mask < 8; mask++) {
       if (forceMask != null && mask !== forceMask) continue;
       const m = build(ver, codewords, mask), p = penalty(m); if (p < bestP) { best = m; bestP = p; }
     }
+    return best;
+  };
+
+  window.irlQr = function (text, forceMask) {
+    const best = window.irlQrMatrix(text, forceMask);
     const n = best.length, q = 4;
     let path = '';
     best.forEach((row, y) => row.forEach((d, x) => { if (d) path += `M${x + q} ${y + q}h1v1h-1z`; }));

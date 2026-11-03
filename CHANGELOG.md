@@ -11,6 +11,19 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Added
+- **The dashboard on your phone with no account at all.** New first choice in Setup, the one-line install and
+  *Set up remote dashboard*: "no account needed". Your dashboard gets your home's internet address, like
+  `https://203.0.113.7`, with a real HTTPS certificate from Let's Encrypt (their certificates for IP addresses,
+  new in 2026), set up and renewed by itself. No DuckDNS, no sign-in, no name to pick; the QR code puts it on your
+  phone. If your internet provider changes your address, IRL Homekit notices within 5 minutes and moves the dashboard
+  with it (scan a new QR code once). With a relay server, it uses the relay's address. DuckDNS and your own domain
+  are still there for one address that never changes.
+- **The QR code is right on Setup's last page.** Setup waits for IRL Homekit to start and for the dashboard's HTTPS
+  certificate, then shows the code next to your login: scan it with your phone's camera and you're signed in, with
+  *Open in IRL Pro* ready. A *New code* button makes another if it runs out (each works once, for 10 minutes). If the
+  certificate can't be issued (the internet can't reach the PC), the page says so and what to run.
+
 ## [1.0.0-beta.19] - 2026-11-03
 
 ### Changed
