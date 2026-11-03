@@ -129,5 +129,5 @@ $ok = Test-Relay
 $deadline = (Get-Date).AddSeconds($WaitSeconds)
 while (-not $ok -and (Get-Date) -lt $deadline) { Start-Sleep 3; $ok = Test-Relay }
 $msg = if ($ok) { "connected to the relay ($relayHost)" }
-       else { "Couldn't reach the relay at $relayHost yet. Check the VM is running, its setup script finished, and its security list lets UDP $WgPort in (docs\RELAY.md)." }
+       else { "Couldn't reach the relay at $relayHost yet. A new VM needs 3-5 minutes to set itself up, and this PC keeps trying by itself: check Status in a few minutes. If it still says not connected, check the VM is running and its security list lets UDP $WgPort in (docs\RELAY.md)." }
 [pscustomobject]@{ Connected = $ok; Message = $msg }

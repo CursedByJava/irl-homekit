@@ -547,8 +547,8 @@ Info 'obs-multi-rtmp plugin installed'
 # ------------------------------------------------------------------ 6. relay, dashboard + Caddy
 Step 6 'Setting up the relay and the remote dashboard'
 $relayIp = Resolve-RelayIp $RelayHost
-New-Item -ItemType Directory -Force "$InstallDir\relay" | Out-Null
 if ($RelayHost) {
+    New-Item -ItemType Directory -Force "$InstallDir\relay" | Out-Null
     # The VM's setup script (same token), kept here in case you need to set up the VM again.
     $vps = [IO.File]::ReadAllText("$repo\templates\relay-vps.sh").Replace("`r`n", "`n").Replace('{{RELAY_TOKEN}}', $s.relayToken).Replace('{{VERSION}}', $Version)
     Write-Utf8 "$InstallDir\relay\relay-vps.sh" $vps
