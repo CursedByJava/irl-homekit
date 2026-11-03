@@ -11,6 +11,8 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.19] - 2026-11-03
+
 ### Changed
 - **The one-line install ends with the QR code too.** When it finishes (and the dashboard is set up for your phone),
   the Connect your phone page opens in your browser by itself, and a password it made for you is copied, like
@@ -320,7 +322,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.18...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.19...HEAD
+[1.0.0-beta.19]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.18...v1.0.0-beta.19
 [1.0.0-beta.18]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.17...v1.0.0-beta.18
 [1.0.0-beta.17]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.16...v1.0.0-beta.17
 [1.0.0-beta.16]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.15...v1.0.0-beta.16
