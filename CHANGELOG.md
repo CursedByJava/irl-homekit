@@ -11,6 +11,11 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Fixed
+- **No more grey box with black text at the top of the installer window** (the one-line install and Install IRL
+  Homekit.cmd): that was Windows PowerShell's own download progress bar. It's off now, which also makes the
+  downloads much faster; the installer's own lines say what it's downloading. Same for the updater window.
+
 ### Changed
 - **Blocked by Windows? The one-line install is now right under the download button** (README and release notes),
   with a copy button: right-click Start, Terminal, paste, Enter. It runs the same installer, and Smart App Control has

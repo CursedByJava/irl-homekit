@@ -10,6 +10,7 @@ param(
     [switch] $Check, [switch] $Prompt, [switch] $Yes
 )
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'   # no grey progress box over the window (and much faster downloads)
 $repoSlug = 'CursedByJava/irl-homekit'
 $settings = Get-Content "$InstallDir\settings.json" -Raw | ConvertFrom-Json
 # Copies installed before version numbers existed were all betas.

@@ -105,8 +105,9 @@ function Resolve-RelayIp($h) {
 $result = [ordered]@{ ok = $false; version = ''; warnings = @() }
 # Setup.exe shows this script's output live; send it as UTF-8 so dashes and quotes come through.
 if ($ResultFile) { try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { } }
-# Windows PowerShell's download progress bar slows big downloads (OBS) down a lot when nobody is watching it.
-if ($NonInteractive -or $ResultFile) { $ProgressPreference = 'SilentlyContinue' }
+# No Windows PowerShell progress bar: it slows big downloads (OBS) down a lot, and in a console window (the
+# one-line install, Install IRL Homekit.cmd) it's a light grey box with black text over the installer's own lines.
+$ProgressPreference = 'SilentlyContinue'
 
 # Pinned downloads. Bump versions here; the installer refuses files whose SHA-256 doesn't match.
 $Downloads = @(
@@ -327,7 +328,7 @@ New-Item -ItemType Directory -Force "$InstallDir\_downloads", "$InstallDir\logs"
 foreach ($d in $Downloads) {
     $zip = Join-Path "$InstallDir\_downloads" (Split-Path $d.Url -Leaf)
     if (-not (Test-Path $zip) -or (Get-FileHash $zip).Hash.ToLower() -ne $d.Sha) {
-        Info "$($d.Name): downloading"
+        Info "$($d.Name): downloading (this can take a minute)"
         Invoke-WebRequest $d.Url -OutFile $zip -UseBasicParsing
     }
     if ((Get-FileHash $zip).Hash.ToLower() -ne $d.Sha) { Remove-Item $zip -Force; throw "$($d.Name): checksum mismatch, download refused." }
