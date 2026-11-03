@@ -22,7 +22,7 @@ function dashboard() {
     mediamtx: ['Backup receiver (MediaMTX)', 'Receives the backup SRT/RTMP connection.'],
     noalbs: ['Auto-switcher (NOALBS)', 'Switches LIVE / LOW / BRB scenes based on your signal.'],
     caddy: ['Web server (Caddy)', 'Serves this page securely over HTTPS from your home PC.'],
-    frpc: ['Relay connection (frp)', 'Connects this PC to your relay server, which receives the phone stream (no router port forwarding).'],
+    relay: ['Relay connection (WireGuard)', 'Connects this PC to your relay server, which receives the phone stream (no router port forwarding).'],
   };
   let s = null; let lastMsg = 0; let busy = false;
 
@@ -283,7 +283,10 @@ function dashboard() {
     else hb.classList.remove('show');
     $('services').replaceChildren(...Object.entries(SERVICE_INFO).filter(([k]) => k in sv).map(([k, [title, d]]) => {
       const it = el('div', 'item'); const ok = sv[k];
-      const g = el('div', 'grow'); g.append(el('div', 'title', title), el('div', 'desc', ok === false ? 'Not running. Restarting automatically…' : d));
+      // The relay is a server out on the internet: when it doesn't answer, it's usually the VM, not this PC.
+      const downText = k === 'relay' ? 'Your relay server doesn\'t answer. Check the VM is running and its security list lets UDP 51820 in (docs/RELAY.md).'
+        : 'Not running. Restarting automatically…';
+      const g = el('div', 'grow'); g.append(el('div', 'title', title), el('div', 'desc', ok === false ? downText : d));
       it.append(el('span', 'status-dot ' + (ok ? 'ok' : ok === false ? 'bad' : '')), g);
       if (k !== 'obs') {
         const b = el('button', 'btn small ghost', 'Restart');
@@ -291,7 +294,7 @@ function dashboard() {
           const what = {
             noalbs: 'Auto-switching pauses for about 10 seconds. Your stream keeps running.',
             caddy: 'This page disconnects for about 10 seconds, then reconnects by itself. Your stream keeps running.',
-            frpc: 'The phone and this page lose the relay for about 10 seconds. Viewers may see the Be Right Back scene briefly.',
+            relay: 'The phone and this page lose the relay for a few seconds. Viewers may see the Be Right Back scene briefly.',
           }[k] || 'If your phone is sending through it, viewers see the Be Right Back scene for about 10–15 seconds.';
           const yes = await confirmBox('Restart ' + title + '?', what, 'Restart', 'Keep running');
           if (yes) act({ action: 'restartService', service: k }, title + ' is restarting.', 'It comes back within about 10 seconds.');

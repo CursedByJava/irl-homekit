@@ -246,10 +246,17 @@ function pollServices() {
     // OBS: your normal OBS may be open too, so "running" means IRL Homekit's own OBS answering on its WebSocket.
     state.services = { obs: obs.ready, mediamtx: names.has('mediamtx.exe'), 'go-irl': names.has('go-irl.exe'), noalbs: names.has('noalbs.exe') };
     if (settings.domain) state.services.caddy = names.has('caddy.exe');
-    if (settings.relayHost) state.services.frpc = names.has('frpc.exe');   // relay client (docs/RELAY.md)
+    if (settings.relayHost) state.services.relay = relayUp;   // relay tunnel (docs/RELAY.md), see pollRelay
     // Programs Windows Smart App Control refused to start (written by the app, scripts/Start-IRLHomekit.ps1).
     try { state.blocked = JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'blocked.json'), 'utf8')); } catch { state.blocked = []; }
   });
+}
+
+// Relay tunnel (WireGuard service, scripts/Set-IRLRelay.ps1): up when the relay answers at its tunnel address.
+let relayUp = false;
+function pollRelay() {
+  if (!settings.relayHost) return;
+  execFile('ping', ['-n', '1', '-w', '2000', '10.66.66.1'], { windowsHide: true }, (err, out) => { relayUp = !err && /TTL=/i.test(out); });
 }
 
 function pollSwitches() {
@@ -285,6 +292,7 @@ setInterval(() => {
 setInterval(pollObs, 1000); setInterval(pollMediamtx, 1000); setInterval(pollInputs, 3000);
 setInterval(pollServices, 5000); setInterval(pollSwitches, 3000); setInterval(grabPreview, 2000);
 pollServices(); pollSwitches();
+setInterval(pollRelay, 15000); pollRelay();
 setInterval(readAutoStart, 30000); readAutoStart();
 
 // ---------------------------------------------------------------- updates (GitHub releases)
@@ -582,7 +590,7 @@ fs.watchFile(CONFIG_FILE, { interval: 2000 }, () => {
 });
 
 // ---------------------------------------------------------------- actions
-const SERVICE_EXE = { 'go-irl': 'go-irl.exe', mediamtx: 'mediamtx.exe', noalbs: 'noalbs.exe', caddy: 'caddy.exe', frpc: 'frpc.exe' };
+const SERVICE_EXE = { 'go-irl': 'go-irl.exe', mediamtx: 'mediamtx.exe', noalbs: 'noalbs.exe', caddy: 'caddy.exe' };
 async function action(body) {
   switch (body.action) {
     case 'startStream': return obs.req('StartStream');
@@ -724,6 +732,12 @@ async function action(body) {
       return { note: state.autoStart ? 'IRL Homekit opens when the PC signs in.' : 'IRL Homekit stays closed after a restart until someone opens it.' };
     }
     case 'restartService': {
+      if (body.service === 'relay') {   // a Windows service, not a program the watchdog starts (the dashboard runs as admin)
+        await new Promise((res, rej) => execFile('powershell.exe', ['-NoProfile', '-Command', "Restart-Service -Name 'WireGuardTunnel$irlhk' -Force"],
+          { windowsHide: true }, (err) => (err ? rej(new Error('Couldn\'t restart the relay tunnel')) : res())));
+        setTimeout(pollRelay, 5000);
+        return { note: 'the relay tunnel reconnects within a few seconds' };
+      }
       const exe = SERVICE_EXE[body.service]; if (!exe) throw new Error('unknown service');
       await new Promise((res) => execFile('taskkill', ['/IM', exe, '/F'], { windowsHide: true }, () => res()));
       return { note: 'watchdog restarts it within ~10 s' };

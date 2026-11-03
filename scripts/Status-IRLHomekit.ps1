@@ -5,7 +5,6 @@ $settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
 
 Write-Host "`n== Processes" -ForegroundColor Cyan
 $names = @('obs64', 'mediamtx', 'go-irl', 'noalbs'); if (Test-Path "$root\caddy\Caddyfile") { $names += 'caddy' }
-if ($settings.relayHost) { $names += 'frpc' }
 foreach ($p in $names) {
     # Only IRL Homekit's own OBS counts (your normal OBS may be open too).
     $proc = Get-Process -Name $p -ErrorAction SilentlyContinue | Where-Object { $p -ne 'obs64' -or $_.Path -eq (Join-Path $settings.obsDir 'obs64.exe') }
@@ -27,14 +26,12 @@ if ($goirl) { Write-Host '  go-irl last log lines:'; $goirl | ForEach-Object { "
 
 if ($settings.relayHost) {
     Write-Host "`n== Relay ($($settings.relayHost))" -ForegroundColor Cyan
-    $rl = @(Get-Content "$root\logs\frpc.out.log" -Tail 200 -ErrorAction SilentlyContinue)
-    $ok = $rl | Where-Object { $_ -match 'login to server success' } | Select-Object -Last 1
-    $err = $rl | Where-Object { $_ -match '\[E\]|\[W\]' } | Select-Object -Last 1
-    if ($ok -and (-not $err -or [array]::LastIndexOf($rl, $ok) -gt [array]::LastIndexOf($rl, $err))) { Write-Host '  connected: the phone and dashboard come in through the relay' -ForegroundColor Green }
-    else {
-        Write-Host '  NOT connected. Check the relay VM is running and its firewall/security list (docs\RELAY.md).' -ForegroundColor Red
-        if ($err) { Write-Host "  last message: $err" }
-    }
+    # The tunnel (WireGuard service, scripts\Set-IRLRelay.ps1) is up when the relay answers at its tunnel address.
+    $wg = Get-Service 'WireGuardTunnel$irlhk' -ErrorAction SilentlyContinue
+    if (-not $wg) { Write-Host '  NOT set up: the relay tunnel is missing. Run Setup again (or Set-IRLRelay.ps1 as administrator).' -ForegroundColor Red }
+    elseif ($wg.Status -ne 'Running') { Write-Host "  NOT connected: the relay tunnel is $($wg.Status.ToString().ToLower()). Open IRL Homekit (it starts it) or restart the PC." -ForegroundColor Red }
+    elseif (Test-Connection 10.66.66.1 -Count 2 -Quiet) { Write-Host '  connected: the phone and dashboard come in through the relay' -ForegroundColor Green }
+    else { Write-Host '  NOT connected: the relay doesn''t answer. Check the VM is running and its security list lets UDP 51820 in (docs\RELAY.md).' -ForegroundColor Red }
 }
 
 Write-Host "`n== Public IP" -ForegroundColor Cyan

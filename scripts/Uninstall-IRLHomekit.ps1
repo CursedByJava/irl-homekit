@@ -22,7 +22,7 @@ $wipe = $DeleteFiles -or (-not $Yes -and (Read-Host "Also delete $InstallDir (se
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -like '*Start-IRLHomekit.ps1*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Get-Process obs64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\obs\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process noalbs, go-irl, mediamtx, caddy, frpc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 $dash = (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
 if ($dash) { Stop-Process -Id $dash -Force -ErrorAction SilentlyContinue }
 Write-Host '  closed'
@@ -42,6 +42,11 @@ Get-NetFirewallRule -DisplayName 'IRL Homekit - *' -ErrorAction SilentlyContinue
 $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\IRLHomekit'
 if (Test-Path $key) { Remove-Item $key -Force }
 Write-Host '  firewall rules and app entry removed'
+# The relay tunnel (docs/RELAY.md), if there is one. WireGuard itself stays installed (Settings > Apps to remove it).
+if (Get-Service 'WireGuardTunnel$irlhk' -ErrorAction SilentlyContinue) {
+    & "$env:ProgramFiles\WireGuard\wireguard.exe" /uninstalltunnelservice irlhk
+    Write-Host '  relay tunnel removed (WireGuard stays installed; remove it in Settings > Apps if you don''t use it)'
+}
 
 # 4. Files.
 if ($wipe) {
@@ -52,5 +57,5 @@ if ($wipe) {
 } else {
     Write-Host "  kept $InstallDir (delete it yourself whenever you like)"
 }
-Write-Host "`nIRL Homekit is uninstalled. Remember to remove the port forwards on your router." -ForegroundColor Green
+Write-Host "`nIRL Homekit is uninstalled. Remember to remove the port forwards on your router (or delete the relay VM)." -ForegroundColor Green
 if (-not $Yes) { Read-Host 'Press Enter to close' }

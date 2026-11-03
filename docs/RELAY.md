@@ -16,8 +16,12 @@ phone settings only ever see the relay's address.
 - **Cost:** free, on Oracle Cloud's Always Free tier (10 TB of outgoing traffic a month; a stream at 8 Mbps is about
   3.6 GB an hour). Oracle asks for a card to sign up, but Always Free resources aren't charged.
 - **Delay:** pick the region nearest to you and it adds a few milliseconds, far less than SRT's 2-second buffer.
-- **Software:** the relay runs [frp](https://github.com/fatedier/frp) (open source), pinned and checksum-verified,
-  the same version on both ends. Only IRL Homekit (with your relay password) can use it, and only for its own ports.
+- **Software:** the PC connects to the relay with [WireGuard](https://www.wireguard.com), the open-source VPN, in
+  its official signed Windows version (so Windows Smart App Control and antivirus allow it), pinned and
+  checksum-verified. It runs as a Windows service that starts with Windows, and only carries the relay's own traffic:
+  the rest of your PC's internet doesn't go through it. On the VM, the setup script installs WireGuard and HAProxy
+  from Ubuntu's own packages. Only your PC (with your relay password) can connect, and the VM only passes on
+  IRL Homekit's ports.
 
 Setup.exe walks you through all of this on the **Phone connection** page. The steps in detail:
 
@@ -36,7 +40,7 @@ Setup.exe walks you through all of this on the **Phone connection** page. The st
    - **Advanced options → Management → Initialization script → Paste cloud-init script:** paste the relay setup script
      that Setup.exe shows you (the **Copy setup script** button). It's also saved as `C:\IRLHomekit\relay\relay-vps.sh`
      after installing. It contains your relay password: don't post it anywhere.
-   - Click **Create**. The script runs by itself on first boot (give it 2-3 minutes).
+   - Click **Create**. The script runs by itself on first boot (give it 3-5 minutes: it installs WireGuard and HAProxy first).
 4. Copy the VM's **Public IP address** from its page. That's what you enter in Setup.
 
 ## 2. Open the ports in Oracle's firewall (security list)
@@ -50,8 +54,7 @@ with **Source CIDR** `0.0.0.0/0`:
 |---|---|---|
 | UDP | `5000` | Bonded phone stream (SRTLA) |
 | UDP | `8890` | Backup phone stream (SRT) |
-| UDP | `7000` | The tunnel from your home PC |
-| TCP | `7000` | The tunnel (fallback / control) |
+| UDP | `51820` | The tunnel from your home PC (WireGuard) |
 | TCP | `1935` | Backup phone stream (RTMP), optional |
 | TCP | `80`, `443` | Remote dashboard, only if you use one |
 
@@ -63,15 +66,21 @@ address. With a DuckDNS name, IRL Homekit points the name at the relay for you.
 
 ## Checking and fixing
 
-- **Start menu → IRL Homekit - Status** shows "Relay: connected" or the last error.
-- *"login to server failed … i/o timeout"*: UDP/TCP 7000 isn't open in the security list, the VM is stopped, or the
-  setup script didn't run. On the VM: `sudo systemctl status irlhk-relay`.
-- *"token in login doesn't match"*: the VM was set up with a different script. Run the saved one again on the VM:
-  `sudo bash relay-vps.sh` (copy `C:\IRLHomekit\relay\relay-vps.sh` over), or recreate the VM with it.
+- **Start menu → IRL Homekit - Status** shows whether the relay is connected, and the dashboard shows it under
+  *Home PC* (with a Restart button).
+- *"the relay doesn't answer"*: UDP 51820 isn't open in the security list, the VM is stopped, or its setup script
+  didn't run (or hasn't finished: give a new VM 3-5 minutes). On the VM:
+  `sudo systemctl status wg-quick@irlhk irlhk-relay-web` and `sudo wg show` (a "latest handshake" means the PC got in).
+- Still no handshake: the VM was set up with a different script (another relay password). Run the saved one again on
+  the VM: `sudo bash relay-vps.sh` (copy `C:\IRLHomekit\relay\relay-vps.sh` over), or recreate the VM with it.
+- *"the relay tunnel is missing"*: run Setup again (it sets the tunnel up), or as administrator:
+  `C:\IRLHomekit\scripts\Set-IRLRelay.ps1 -WaitSeconds 60`.
 - Connected but the phone can't reach it: check UDP 5000 / 8890 in the security list.
+- Connected but the remote dashboard doesn't load: check TCP 80 / 443 in the security list.
 - Moving to a new VM: create it with the same script and run Setup again with the new IP.
 - Turning the relay off: run Setup again and choose **Router port forwarding** (then set up your router, `ROUTER.md`).
-- Uninstalling IRL Homekit doesn't touch the VM; delete it in Oracle Cloud if you no longer need it.
+- Uninstalling IRL Homekit removes the tunnel but doesn't touch the VM (delete it in Oracle Cloud if you no longer
+  need it) or the WireGuard app (Settings → Apps, if you don't use it for anything else).
 
 Other free hosts work too if they give you a public IPv4 address and enough traffic: run the setup script on any
 Ubuntu or Debian VM with `sudo bash relay-vps.sh`, and open the same ports in that host's firewall.

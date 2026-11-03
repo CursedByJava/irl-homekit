@@ -181,7 +181,7 @@ function Test-ObsCrashed {
 function Stop-Everything {
     Log 'IRL Homekit OBS was closed; stopping everything'
     # Only this install's copies.
-    Get-Process -Name noalbs, go-irl, mediamtx, caddy, frpc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\*" } |
+    Get-Process -Name noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\*" } |
         Stop-Process -Force -ErrorAction SilentlyContinue
     $d = Get-DashboardPid
     if ($d -and (Get-CimInstance Win32_Process -Filter "ProcessId=$d").CommandLine -like "*$root\dashboard\server.mjs*") {
@@ -248,9 +248,11 @@ while ($true) {
     if (Test-Path "$root\caddy\Caddyfile") {
         Ensure 'caddy' "$root\caddy\caddy.exe" @('run', '--config', "$root\caddy\Caddyfile", '--adapter', 'caddyfile') "$root\caddy"
     }
-    # Relay server (docs/RELAY.md): this PC dials out to it, so the router needs no port forwarding.
-    if ($settings.relayHost -and (Test-Path "$root\relay\frpc.toml")) {
-        Ensure 'frpc' "$root\frp\frpc.exe" @('-c', "$root\relay\frpc.toml") "$root\frp"
+    # Relay server (docs/RELAY.md): a WireGuard tunnel service (scripts\Set-IRLRelay.ps1) that starts with Windows.
+    # Start it again if something stopped it.
+    if ($settings.relayHost) {
+        $wg = Get-Service 'WireGuardTunnel$irlhk' -ErrorAction SilentlyContinue
+        if ($wg -and $wg.Status -eq 'Stopped') { Log 'relay tunnel was stopped; starting it'; Start-Service $wg.Name -ErrorAction SilentlyContinue }
     }
   } catch {
     # Never let one bad check stop the watchdog; log it and keep going.

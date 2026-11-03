@@ -110,9 +110,7 @@ $Downloads = @(
     @{ Name = 'Caddy'; Url = 'https://github.com/caddyserver/caddy/releases/download/v2.11.7/caddy_2.11.7_windows_amd64.zip'
        Sha = '0a1edc0b799512051c57071ce0e798d3f2cf67dc98171366f1d2b326072e3b06'; Dir = 'caddy' }
 )
-# Only with a relay server (docs/RELAY.md). The relay VM's setup script pins the same version.
-$FrpDownload = @{ Name = 'frp (relay client)'; Url = 'https://github.com/fatedier/frp/releases/download/v0.71.1/frp_0.71.1_windows_amd64.zip'
-    Sha = 'b90074b2b6a1d792a7a40f085ac6d276bcab2d1bc60201f8a86ca53ce65ce821'; Dir = 'frp' }
+# With a relay server (docs/RELAY.md), scripts\Set-IRLRelay.ps1 also installs WireGuard (pinned there).
 
 # ------------------------------------------------------------------ 0. checks
 $result.version = $Version
@@ -233,7 +231,6 @@ if ($DuckDnsName -and -not $DuckDnsToken -and -not $oldSecrets.duckdnsToken) {
 $RelayHost = "$RelayHost".Trim().ToLower() -replace '^[a-z]+://', '' -replace '[:/].*$', ''
 if ($RelayHost -eq 'off') { $RelayHost = '' }
 if ($RelayHost -and $RelayHost -notmatch '^(\d{1,3}(\.\d{1,3}){3}|[a-z0-9-]+(\.[a-z0-9-]+)+)$') { throw "Relay server '$RelayHost' is not an IP address or host name." }
-if ($RelayHost) { $Downloads += $FrpDownload }
 $studioDomain = if (-not $Domain) { '' } elseif ($Domain -match '^[a-z0-9-]+\.duckdns\.org$') { "studio.$Domain" } else { 'studio.' + ($Domain -replace '^[^.]+\.', '') }
 # Dashboard login: asked on the first install only. Change it later with the "IRL Homekit - Change login" shortcut.
 $login = $null
@@ -285,7 +282,7 @@ if (-not $SkipSystem) {
         Start-Sleep 2; Get-ChildItem "$BaseObsConfigDir\.sentinel" -Filter 'run_*' -File -ErrorAction SilentlyContinue | Remove-Item -Force
         Info 'closed the previous IRL Homekit'
     }
-    Get-Process noalbs, go-irl, mediamtx, caddy, frpc -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process noalbs, go-irl, mediamtx, caddy -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
     $dash = (Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
     if ($dash) { Stop-Process -Id $dash -Force -ErrorAction SilentlyContinue }
     Start-Sleep 1
@@ -318,9 +315,6 @@ foreach ($d in $Downloads) {
     }
     # NOALBS zips its files inside a versioned folder; flatten it.
     Get-ChildItem $dest -Directory -Filter 'noalbs-v*' | ForEach-Object { Get-ChildItem $_.FullName -Force | Move-Item -Destination $dest -Force; Remove-Item $_.FullName -Force }
-    # frp too (frp_0.71.1_windows_amd64\frpc.exe). Only the client is needed on this PC.
-    Get-ChildItem $dest -Directory -Filter 'frp_*' | ForEach-Object { Get-ChildItem $_.FullName -Force | Move-Item -Destination $dest -Force; Remove-Item $_.FullName -Recurse -Force }
-    if ($d.Dir -eq 'frp') { Remove-Item "$dest\frps.exe", "$dest\frps.toml" -Force -ErrorAction SilentlyContinue }
     Write-Utf8 $marker $d.Sha
     Info "$($d.Name): ok"
 }
@@ -328,8 +322,7 @@ foreach ($d in $Downloads) {
 # tools. Run each one once so a block is explained now, not discovered later as "not running".
 $blocked = @()
 foreach ($t in @(@('go-irl', "$InstallDir\go-irl\go-irl.exe", '-h'), @('MediaMTX', "$InstallDir\mediamtx\mediamtx.exe", '--help'),
-                 @('NOALBS', "$InstallDir\noalbs\noalbs.exe", '--help'), @('Caddy', "$InstallDir\caddy\caddy.exe", 'version'),
-                 @('frp', "$InstallDir\frp\frpc.exe", '--version'))) {
+                 @('NOALBS', "$InstallDir\noalbs\noalbs.exe", '--help'), @('Caddy', "$InstallDir\caddy\caddy.exe", 'version'))) {
     if (-not (Test-Path $t[1])) { continue }
     try {
         $p = Start-Process $t[1] -ArgumentList $t[2] -WindowStyle Hidden -PassThru -ErrorAction Stop
@@ -368,7 +361,7 @@ foreach ($k in @{ goirlPassphrase = 20; mediamtxPass = 16; obsWebsocketPassword 
     if (-not $s.($k.Key)) { $s | Add-Member -Force $k.Key (New-Secret $k.Value) }
 }
 if (-not $s.mediamtxUser) { $s | Add-Member -Force mediamtxUser 'irl' }
-# OBS's own login for reading the backup feed (behind a relay, outside connections also come from 127.0.0.1).
+# OBS's own login for reading the backup feed (nothing gets the feed just for coming from this PC).
 if (-not $s.mediamtxReadUser) { $s | Add-Member -Force mediamtxReadUser 'obs' }
 if (-not $s.mediamtxReadPass) { $s | Add-Member -Force mediamtxReadPass (New-Secret 16) }
 if ($login) { $s | Add-Member -Force dashboardUser $login.Username; $s | Add-Member -Force dashboardPassword $login.Password }
@@ -411,14 +404,14 @@ authInternalUsers:
     permissions:
       - action: publish
         path: live
-  # OBS reads the stream with its own login (with a relay server, outside connections also come from 127.0.0.1).
+  # OBS reads the stream with its own login (nothing gets the feed just for coming from this PC).
   - user: $($s.mediamtxReadUser)
     pass: $($s.mediamtxReadPass)
     ips: []
     permissions:
       - action: read
         path: live
-  # NOALBS and the dashboard on this PC use the API (bound to 127.0.0.1, never relayed) without a password.
+  # NOALBS and the dashboard on this PC use the API (bound to 127.0.0.1, so never reachable from outside) without a password.
   - user: any
     pass:
     ips: ["127.0.0.1", "::1"]
@@ -559,35 +552,13 @@ if ($RelayHost) {
     # The VM's setup script (same token), kept here in case you need to set up the VM again.
     $vps = [IO.File]::ReadAllText("$repo\templates\relay-vps.sh").Replace("`r`n", "`n").Replace('{{RELAY_TOKEN}}', $s.relayToken).Replace('{{VERSION}}', $Version)
     Write-Utf8 "$InstallDir\relay\relay-vps.sh" $vps
-    # frpc: this PC dials out to the relay over QUIC (UDP 7000) and the relay passes these ports back down.
-    # 80/443 always, so turning on the remote dashboard later (Setup-RemoteDashboard.ps1) needs no relay change.
-    $proxies = @(@('srtla', 'udp', 5000), @('srt', 'udp', 8890), @('rtmp', 'tcp', 1935), @('http', 'tcp', 80), @('https', 'tcp', 443))
-    $toml = @"
-# IRL Homekit relay client (frp). Written by the installer; re-run Setup to change it.
-serverAddr = "$RelayHost"
-serverPort = 7000
-loginFailExit = false
-auth.method = "token"
-auth.token = "$($s.relayToken)"
-transport.protocol = "quic"
-log.to = "console"
-log.level = "info"
-
-"@
-    foreach ($p in $proxies) {
-        $toml += "[[proxies]]`nname = `"irlhk-$($p[0])`"`ntype = `"$($p[1])`"`nlocalIP = `"127.0.0.1`"`nlocalPort = $($p[2])`nremotePort = $($p[2])`n"
-        # The web server sees the visitor's real address (sign-in lockouts are per visitor), via the PROXY protocol.
-        if ($p[1] -eq 'tcp' -and $p[2] -in 80, 443) { $toml += "transport.proxyProtocolVersion = `"v2`"`n" }
-        $toml += "`n"
-    }
-    Write-Utf8 "$InstallDir\relay\frpc.toml" $toml
+    # The tunnel itself (WireGuard, scripts\Set-IRLRelay.ps1) is set up at the end, with the other system changes.
     Info "relay: phone and dashboard traffic arrives through $RelayHost (no router port forwarding needed)"
     if (-not $relayIp) { $result.warnings += "Couldn't look up the relay server '$RelayHost'. Check the address."; Write-Warning "Couldn't look up '$RelayHost'." }
-} else {
-    Remove-Item "$InstallDir\relay\frpc.toml" -Force -ErrorAction SilentlyContinue
 }
-# Behind the relay every connection comes from frpc on this PC, carrying the visitor's address in a PROXY header.
-$caddyServers = if ($RelayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 127.0.0.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
+# Behind the relay, dashboard visitors arrive from the relay's tunnel address (10.66.66.1), with their own address in
+# a PROXY header added by the relay (sign-in limits are per visitor).
+$caddyServers = if ($RelayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 10.66.66.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
 & "$InstallDir\scripts\Set-DashboardLogin.ps1" -InstallDir $InstallDir -Username $s.dashboardUser -Password $s.dashboardPassword -Quiet
 Info "dashboard login: user $($s.dashboardUser)"
 if ($Domain) {
@@ -664,24 +635,19 @@ Write-Utf8 "$InstallDir\PHONE-SETUP.md" $guide
 
 $relayOk = $null
 if (-not $SkipSystem) {
-    Start-ScheduledTask -TaskName 'IRL Homekit'
-    if ($RelayHost) {
-        # IRL Homekit starts the relay client a few seconds after it opens; wait for it to sign in to the relay.
-        Step 9 "Connecting to your relay ($RelayHost)"
-        $log = "$InstallDir\logs\frpc.out.log"; $deadline = (Get-Date).AddSeconds(75); $relayOk = $false
-        while ((Get-Date) -lt $deadline) {
-            $tail = Get-Content $log -Tail 40 -ErrorAction SilentlyContinue
-            if ($tail -match 'login to server success') { $relayOk = $true; break }
-            Start-Sleep 3
+    # The relay tunnel (WireGuard, a Windows service that starts at boot), or removing it when the relay is off.
+    if ($RelayHost) { Step 9 "Connecting to your relay ($RelayHost)" }
+    try {
+        $r = & "$InstallDir\scripts\Set-IRLRelay.ps1" -InstallDir $InstallDir -WaitSeconds $(if ($RelayHost) { 60 } else { 0 })
+        if ($RelayHost) {
+            $relayOk = [bool]$r.Connected
+            if ($relayOk) { Info $r.Message } else { $result.warnings += $r.Message; Write-Warning $r.Message }
         }
-        if ($relayOk) { Info 'connected to the relay' }
-        else {
-            $why = ($tail | Where-Object { $_ -match '\[E\]|\[W\]' } | Select-Object -Last 1)
-            $msg = "Couldn't connect to the relay at $RelayHost yet. Check the VM is running, its setup script finished, and Oracle's security list opens UDP and TCP 7000 (docs\RELAY.md)."
-            if ($why) { $msg += " Last message: $($why -replace '^.*\[[EW]\] (\[[^\]]*\] )?', '')" }
-            $result.warnings += $msg; Write-Warning $msg
-        }
+    } catch {
+        $relayOk = $false; $msg = "Couldn't set up the relay tunnel: $($_.Exception.Message)"
+        $result.warnings += $msg; Write-Warning $msg
     }
+    Start-ScheduledTask -TaskName 'IRL Homekit'
     if ($setupRemote) { Step 9 'Remote dashboard'; & "$InstallDir\scripts\Setup-RemoteDashboard.ps1" -InstallDir $InstallDir }
 }
 

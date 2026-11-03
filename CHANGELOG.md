@@ -24,9 +24,11 @@ is what the built-in update checker reads.
 - **No port forwarding needed (optional relay server).** If you can't forward ports on your router (or your provider
   uses CGNAT), Setup can set you up with a free relay on Oracle Cloud's Always Free tier: it gives you a script to paste
   when you create the VM, and you enter the VM's address. Your phone then streams to the relay and your PC connects out
-  to it, so the router needs nothing, and your home IP stays private. Uses [frp](https://github.com/fatedier/frp)
-  (pinned, checksum-verified) on both ends; the remote dashboard works through it too, with HTTPS. The phone guide,
-  Phone settings, Status, the dashboard's Home PC checks and DuckDNS all follow the relay. Step by step:
+  to it, so the router needs nothing, and your home IP stays private. The PC connects with
+  [WireGuard](https://www.wireguard.com) (the official signed Windows version, pinned and checksum-verified, so Smart
+  App Control allows it), as a Windows service that only carries the relay's traffic. The remote dashboard works
+  through it too, with HTTPS end to end and visitors' real addresses for the sign-in limits. The phone guide, Phone
+  settings, Status, the dashboard's Home PC checks and DuckDNS all follow the relay. Step by step:
   [docs/RELAY.md](docs/RELAY.md).
 - **Phone settings on the dashboard.** A new card shows everything to enter in IRL Pro (bonded SRTLA server and
   passphrase, backup SRT server and stream ID, RTMP), each with a Copy button, so you can set up or fix the phone from
@@ -35,8 +37,8 @@ is what the built-in update checker reads.
 
 ### Changed
 - OBS now reads the backup phone feed from MediaMTX with its own password instead of being trusted for coming from
-  this PC. Behind a relay server every outside connection also arrives from this PC, so this keeps the feed private.
-  Applied automatically by the update (the IRL scenes are rebuilt as usual).
+  this PC, so nothing on the network can watch the feed without a password. Applied automatically by the update (the
+  IRL scenes are rebuilt as usual).
 
 ### Fixed
 - Status always showed the IP address from install in the IRL Pro settings, even with a DuckDNS name, and kept showing

@@ -43,7 +43,7 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
 | ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" warning (small, bottom-left) | `overlays/` (OBS browser sources) |
 | ✅ | Free HTTPS on your own domain | [Caddy](https://caddyserver.com) + Let's Encrypt |
-| ✅ | No port forwarding needed (optional): a free relay server in front of your PC, also hides your home IP | [frp](https://github.com/fatedier/frp) on Oracle Cloud Always Free, see [RELAY.md](docs/RELAY.md) |
+| ✅ | No port forwarding needed (optional): a free relay server in front of your PC, also hides your home IP | [WireGuard](https://www.wireguard.com) to a VM on Oracle Cloud Always Free, see [RELAY.md](docs/RELAY.md) |
 | ✅ | A normal Windows setup wizard | `installer/` ([Inno Setup](https://jrsoftware.org/isinfo.php)) |
 | ✅ | Starts with Windows (optional), restarts anything that crashes | `scripts/Start-IRLHomekit.ps1` |
 
@@ -236,7 +236,7 @@ Connecting Kick and YouTube uses your own free developer app on each platform. S
 | NOALBS | — | Reads go-irl/MediaMTX stats; LOW < 1000 kbps, BRB < 300 kbps; ends stream after 20 min on BRB |
 | Dashboard | 127.0.0.1:8090 | `dashboard/server.mjs`, Node built-ins only |
 | Caddy | TCP 443/80 (public) | Automatic Let's Encrypt certificate |
-| frpc (optional) | outgoing UDP/TCP 7000 to your relay | Only with a relay server ([RELAY.md](docs/RELAY.md)): the relay receives the public ports above and passes them to this PC |
+| Relay tunnel (optional) | outgoing UDP 51820 to your relay | Only with a relay server ([RELAY.md](docs/RELAY.md)): a WireGuard tunnel (Windows service); the relay receives the public ports above and passes them to this PC |
 | App | — | `scripts/Start-IRLHomekit.ps1`: opens the OBS, keeps every part running, stops everything when the OBS closes |
 
 Files after install (`C:\IRLHomekit`): `secrets.json` (generated passwords, **never share**), `settings.json`,

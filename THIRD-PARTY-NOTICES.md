@@ -10,7 +10,9 @@ using it. None of their code is included in this repository.
 | NOALBS | v2.21.0 | MIT | https://github.com/NOALBS/nginx-obs-automatic-low-bitrate-switching |
 | obs-multi-rtmp | 0.7.4.5 | GPL-2.0 | https://github.com/sorayuki/obs-multi-rtmp |
 | Caddy | v2.11.7 | Apache-2.0 | https://github.com/caddyserver/caddy |
-| frp (only with a relay server; also on the relay VM) | v0.71.1 | Apache-2.0 | https://github.com/fatedier/frp |
+| WireGuard for Windows (only with a relay server; signed MSI, checksum-verified) | 1.1.1 | MIT | https://www.wireguard.com |
+
+On the relay VM, its setup script installs WireGuard tools (GPL-2.0) and HAProxy (GPL-2.0) from Ubuntu's own packages.
 
 Setup.exe is built with Inno Setup (https://jrsoftware.org/isinfo.php, Inno Setup License).
 

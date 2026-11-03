@@ -111,7 +111,7 @@ if ($mode -in 'duck', 'own', 'off') {
     $caddyfile = "$InstallDir\caddy\Caddyfile"
     if ($newDomain) {
         $tpl = [IO.File]::ReadAllText("$InstallDir\templates\Caddyfile")
-        $servers = if ($relayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 127.0.0.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
+        $servers = if ($relayHost) { "servers {`n`t`tlistener_wrappers {`n`t`t`tproxy_protocol {`n`t`t`t`ttimeout 5s`n`t`t`t`tallow 10.66.66.1/32`n`t`t`t}`n`t`t`ttls`n`t`t}`n`t}" } else { '' }
         [IO.File]::WriteAllText($caddyfile, $tpl.Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', "$newDomain, $($settings.studioDomain)").Replace('{{SERVERS}}', $servers), $utf8)
         foreach ($p in 443, 80) {
             $name = "IRL Homekit - Dashboard HTTP$(if ($p -eq 443) { 'S' }) (TCP $p)"

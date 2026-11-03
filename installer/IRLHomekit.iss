@@ -394,7 +394,7 @@ begin
   L := NewLabel(RelayPage, 0,
     '1. Create a free Oracle Cloud account and a VM: Ubuntu image, Always Free shape (step by step: the guide button).' + #13#10 +
     '2. Under Advanced options > Management > Initialization script, paste this setup script (it holds your relay password: keep it private).' + #13#10 +
-    '3. In the VM''s security list, open UDP 5000, 8890, 7000 and TCP 1935, 7000, 80, 443.' + #13#10 +
+    '3. In the VM''s security list, open UDP 5000, 8890, 51820 and TCP 1935, 80, 443.' + #13#10 +
     '4. Enter the VM''s public IP address below.');
   Y := L.Top + L.Height + ScaleY(6);
   NewButton(RelayPage, 0, Y, ScaleX(140), 'Copy setup script', @CopyRelayScript);
