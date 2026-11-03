@@ -100,6 +100,11 @@ function Invoke-Upnp($r, $action, $fields) {
 function Get-UpnpEntry($r, $p) {
     Invoke-Upnp $r 'GetSpecificPortMappingEntry' ([ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Port; NewProtocol = $p.Proto })
 }
+function Test-Forward($p) {
+    if ($p.Proto -ne 'TCP' -or -not $state.externalIp -or -not (Get-NetTCPConnection -LocalPort $p.Port -State Listen -ErrorAction SilentlyContinue)) { return $false }
+    $c = New-Object Net.Sockets.TcpClient
+    try { $c.ConnectAsync($state.externalIp, $p.Port).Wait(2000) -and $c.Connected } catch { $false } finally { $c.Close() }
+}
 function Set-UpnpPort($r, $p) {
     $f = [ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Port; NewProtocol = $p.Proto; NewInternalPort = $p.Port; NewInternalClient = $lan
         NewEnabled = 1; NewPortMappingDescription = $Description; NewLeaseDuration = $LeaseSeconds }
@@ -110,7 +115,13 @@ function Set-UpnpPort($r, $p) {
     $e = Get-UpnpEntry $r $p
     if (-not $e.Error -and $e.NewInternalClient -eq $lan -and "$($e.NewInternalPort)" -eq "$($p.Port)") { return @{ Ok = $true; Note = 'already forwarded to this PC' } }
     if (-not $e.Error -and $e.NewInternalClient) { return @{ Ok = $false; Note = "already forwarded to another device ($($e.NewInternalClient))" } }
-    $why = switch ($a.Error) { '718' { 'already set up in the router''s own port forwarding (fine if that points at this PC)' } { $_ -in '606', '401', '501' } { 'the router refused (it may only allow this for some devices)' }
+    # Taken, but not by a UPnP entry: a forward made in the router's own settings (Verizon answers 729 for those).
+    # A TCP port this PC already listens on is checked by connecting to the home's internet address.
+    if ($a.Error -in '718', '729') {
+        if (Test-Forward $p) { return @{ Ok = $true; Manual = $true; Note = 'already forwarded to this PC in the router''s own settings' } }
+        return @{ Ok = $true; Manual = $true; Unchecked = $true; Note = 'already forwarded in the router''s own settings (make sure it points at this PC)' }
+    }
+    $why = switch ($a.Error) { { $_ -in '606', '401', '501' } { 'the router refused (it may only allow this for some devices)' }
         '724' { 'the router needs the same inside and outside port' } default { "the router refused (error $($a.Error))" } }
     @{ Ok = $false; Note = $why }
 }
@@ -187,9 +198,10 @@ if (-not $state.method) {
 } else {
     foreach ($p in $ports) {
         $r = if ($state.method -eq 'UPnP') { Set-UpnpPort $router $p } else { Set-NatPmpPort $p $LeaseSeconds }
-        $state.ports += [ordered]@{ proto = $p.Proto; port = $p.Port; what = $p.What; ok = $r.Ok; note = $r.Note }
+        $state.ports += [ordered]@{ proto = $p.Proto; port = $p.Port; what = $p.What; ok = $r.Ok; manual = [bool]$r.Manual; unchecked = [bool]$r.Unchecked; note = $r.Note }
     }
     $failed = @($state.ports | Where-Object { -not $_.ok })
+    $manual = @($state.ports | Where-Object { $_.manual })
     $ext = "$($state.externalIp)"
     # The router's own internet address says whether anything outside can reach it.
     if ($ext -match '^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.') {
@@ -201,6 +213,13 @@ if (-not $state.method) {
     } elseif ($failed) {
         $state.problem = 'refused'
         $state.message = "The router opened $($state.ports.Count - $failed.Count) of $($state.ports.Count) ports. Not opened: " + (($failed | ForEach-Object { "$($_.proto) $($_.port) ($($_.note))" }) -join '; ') + '. Forward those to this PC by hand (docs\ROUTER.md); a port another device already has must be freed on the router first.'
+    } elseif ($manual) {
+        $state.ok = $true
+        $names = @($manual | ForEach-Object { "$($_.proto) $($_.port)" })
+        $list = if ($names.Count -gt 1) { ($names[0..($names.Count - 2)] -join ', ') + " and $($names[-1])" } else { $names[0] }
+        $state.message = "Router ports ready ($($state.method)$(if ($state.router) { ", $($state.router)" })): $($state.ports.Count - $manual.Count) opened automatically; $list " +
+            $(if (@($manual | Where-Object { $_.unchecked })) { "are forwarded in the router's own settings (make sure $(if ($names.Count -gt 1) { 'they point' } else { 'it points' }) at this PC, $lan)." }
+              else { "already forwarded to this PC in the router's own settings." })
     } else {
         $state.ok = $true
         $state.message = "Router ports opened automatically ($($state.method)$(if ($state.router) { ", $($state.router)" })): no port forwarding needed."

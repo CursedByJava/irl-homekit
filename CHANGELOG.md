@@ -11,6 +11,15 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.14] - 2026-11-03
+
+### Fixed
+- **Ports you already forwarded in your router's own settings no longer show as "refused".** Some routers (Verizon's
+  Fios router, for one) turn down the automatic request for a port that already has a forward, so with the remote
+  dashboard set up, *Router ports* went red and said to forward 443 and 80 by hand, though they already were.
+  IRL Homekit now counts those as forwarded. When it can, it also checks through your home's internet address that
+  they reach this PC; if it can't check, it says to make sure they point at this PC.
+
 ## [1.0.0-beta.13] - 2026-11-03
 
 ### Added
@@ -235,7 +244,9 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.12...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.14...HEAD
+[1.0.0-beta.14]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.13...v1.0.0-beta.14
+[1.0.0-beta.13]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.12...v1.0.0-beta.13
 [1.0.0-beta.12]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.11...v1.0.0-beta.12
 [1.0.0-beta.11]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.10...v1.0.0-beta.11
 [1.0.0-beta.10]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.9...v1.0.0-beta.10
