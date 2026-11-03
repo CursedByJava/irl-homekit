@@ -1192,8 +1192,11 @@ begin
     CopyPasswordBtn.Visible := True; SaveLoginBtn.Visible := True;
   end
   else S := S + '  Password: the one you chose' + NL;
-  S := S + NL + 'PHONE (IRL Pro / Moblin / BELABOX)' + NL +
-    '  Your settings are in ' + GuidePath + NL +
+  S := S + NL + 'PHONE (IRL Pro / Moblin / BELABOX)' + NL;
+  if HasRemoteDashboard then
+    S := S + '  NEXT: click Finish (with "Show a QR code" ticked) and scan the code with your phone''s camera.' + NL +
+      '  Your phone opens the dashboard signed in; tap Open in IRL Pro there and IRL Pro is set up.' + NL;
+  S := S + '  All your phone settings are also in ' + GuidePath + NL +
     '  and on the dashboard: Phone settings > Show.' + NL;
   if ResultValue('relayHost') <> '' then
   begin

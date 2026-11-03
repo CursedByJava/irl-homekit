@@ -18,6 +18,13 @@ OBS adds your overlays, automatically drops to a "low signal" or "be right back"
 struggles, and sends 1080p60 to Twitch, Kick and YouTube at the same time. A mobile web dashboard lets you watch your
 signal and control everything from the street.
 
+**Get started in 3 steps**
+
+1. **[Download IRL-Homekit-Setup.exe](https://github.com/CursedByJava/irl-homekit/releases/latest/download/IRL-Homekit-Setup.exe)**
+   and run it. Sign in with Twitch on its first page; everything else can stay as it is.
+2. At the end, scan the **QR code** with your phone's camera: your dashboard opens on the phone, signed in.
+3. Tap **Open in IRL Pro** there. IRL Pro is set up. Go live.
+
 ```
 Phone (IRL Pro, bonded 5G + Wi-Fi)
    │  SRTLA → UDP 5000          backup: SRT → UDP 8890 / RTMP → TCP 1935
