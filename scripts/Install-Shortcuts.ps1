@@ -76,6 +76,8 @@ foreach ($name in $tools.Keys) {
 # Small windows, no console.
 New-Link (Join-Path $folder 'IRL Homekit - Connect Twitch.lnk') 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Connect-Twitch.ps1`"" `
     'Sign in with Twitch: stream key, chat commands, Studio and clips in one step' -Minimized
+New-Link (Join-Path $folder 'IRL Homekit - Connect my phone.lnk') 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Show-PhoneQr.ps1`"" `
+    'A QR code to scan with your phone: opens the dashboard signed in, then one tap sets up IRL Pro' -Minimized
 New-Link (Join-Path $folder 'IRL Homekit - Dashboard address.lnk') 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Show-DashboardAddress.ps1`"" `
     'Where your dashboard is, with Copy and Open buttons, to get it onto your phone' -Minimized
 

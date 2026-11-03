@@ -12,6 +12,11 @@ is what the built-in update checker reads.
 ## [Unreleased]
 
 ### Added
+- **Connect your phone with a QR code.** Start menu → *IRL Homekit - Connect my phone* (also offered at the end of
+  Setup, in the *Dashboard address* window, and as *Show QR code* on the dashboard) shows a code: point the phone's
+  camera at it, and the dashboard opens on the phone already signed in, with *Open in IRL Pro* ready. No address or
+  password to type. Each code works once, for 10 minutes, and can only be made on the PC itself or by someone signed
+  in. (Needs the dashboard on your phone set up: a DuckDNS name or your own domain.)
 - **Setup copies the password it made for you**, and its last page has *Copy password* and *Save login to a file*
   buttons (a text file on your desktop, or wherever you like).
 

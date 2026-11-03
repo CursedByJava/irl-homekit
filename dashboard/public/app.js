@@ -6,6 +6,7 @@ if ($('err')) {
   const e = new URLSearchParams(location.search).get('e');
   $('next').value = new URLSearchParams(location.search).get('next') || '';   // back to Studio after signing in
   if (e === 'locked') $('err').innerHTML = '<b>Sign-in is locked for 15 minutes.</b> There were 5 wrong tries in a row from this network. Wait, then try again.';
+  if (e === 'pair') $('err').innerHTML = '<b>That QR code was already used or ran out</b> (each one works once, for 10 minutes). Show a new one on the PC (Start menu &gt; IRL Homekit - Connect my phone), or sign in here.';
   if (e) $('err').classList.add('show');
 } else {
   dashboard();
@@ -97,7 +98,7 @@ function dashboard() {
 
   // ---------- rendering
   function render() {
-    renderTop(); renderSignal(); renderStream(); renderScenes(); renderClips(); renderAddress(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
+    renderTop(); renderSignal(); renderStream(); renderScenes(); renderClips(); renderAddress(); welcomePhone(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
   }
 
   function renderTop() {
@@ -234,6 +235,25 @@ function dashboard() {
       ? 'Only works on the home PC. To use it on your phone: on the PC, Start menu > IRL Homekit - Set up remote dashboard.'
       : 'On your phone, type it into the browser\'s address bar (not a Google search), then Add to Home screen.';
     $('addrCopy').onclick = async () => { if (await copyText(a)) toast('success', 'Copied.', a); else toast('error', 'Couldn\'t copy.', 'Press and hold the address to copy it.'); };
+    $('addrQr').hidden = /localhost/.test(a);
+    $('addrQr').onclick = async () => {
+      try {
+        const r = await fetch('/api/pair', { method: 'POST', headers: { 'X-IRLHK': '1' }, credentials: 'same-origin' });
+        const j = await r.json();
+        if (!j.url) throw new Error(j.error || 'HTTP ' + r.status);
+        $('qrBox').innerHTML = window.irlQr(j.url); $('qrDialog').showModal();
+      } catch (e) { toast('error', 'Couldn\'t make a QR code.', 'The PC said: "' + e.message + '".'); }
+    };
+    $('qrClose').onclick = () => { $('qrDialog').close(); $('qrBox').innerHTML = ''; };
+  }
+
+  // Just signed in by scanning a QR code: show the phone settings, with Open in IRL Pro on top.
+  let phoneWelcome = new URLSearchParams(location.search).get('phone') === '1';
+  if (phoneWelcome) history.replaceState(null, '', '/');
+  function welcomePhone() {
+    if (!phoneWelcome) return; phoneWelcome = false;
+    showPhone().then(() => $('phoneTitle').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    toast('success', 'You\'re signed in on this phone.', 'Tap Open in IRL Pro below to set up IRL Pro. Tip: browser menu > Add to Home screen.');
   }
 
   let clipsKey = '';

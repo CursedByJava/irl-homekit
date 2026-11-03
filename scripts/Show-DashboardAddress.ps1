@@ -30,6 +30,11 @@ $null = Label 'Your dashboard' 18 10 $true $muted
 $addr = Label $dash 40 20 $true
 $null = Button 'Copy' 24 86 { [Windows.Forms.Clipboard]::SetText($dash); $this.Text = 'Copied' }
 $null = Button 'Open' 142 86 { Start-Process $dash }
+if ($domain) {
+    # Scan with the phone's camera: opens the dashboard there, signed in (scripts\Show-PhoneQr.ps1).
+    $qr = Button 'Show QR code' 260 86 { Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Show-PhoneQr.ps1`"" }
+    $qr.Width = 140
+}
 $null = Label "Studio (chat, title, viewers): $studio" 132 10 $false $muted
 $login = if ($cfg.username) { "Sign in as $($cfg.username) with your dashboard password (forgot it? Start menu > IRL Homekit - Change login)." } else { '' }
 if ($domain) {

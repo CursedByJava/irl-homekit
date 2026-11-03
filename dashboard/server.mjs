@@ -662,6 +662,18 @@ function authed(req, res) {
   return t;
 }
 function clientIp(req) { return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress; }
+// "Connect my phone": a QR code with a one-time link that signs the phone in (works once, for 10 minutes). Made only
+// on this PC itself or by someone already signed in.
+const pairCodes = new Map();   // code -> expiry ms
+const PAIR_MS = 10 * 60e3;
+function newPairLink() {
+  if (!settings.domain) return { url: '', error: 'NO_DOMAIN' };
+  for (const [c, exp] of pairCodes) if (exp < Date.now()) pairCodes.delete(c);
+  if (pairCodes.size > 20) pairCodes.delete(pairCodes.keys().next().value);
+  const code = crypto.randomBytes(18).toString('base64url');
+  pairCodes.set(code, Date.now() + PAIR_MS);
+  return { url: `https://${settings.domain}/pair/${code}`, expiresIn: PAIR_MS / 1000 };
+}
 function saveSessions() { fs.writeFile(path.join(DIR, 'sessions.json'), JSON.stringify([...sessions]), () => {}); }
 try {
   for (const [t, v] of JSON.parse(fs.readFileSync(path.join(DIR, 'sessions.json'), 'utf8'))) {
@@ -903,7 +915,8 @@ async function phoneSettings() {
 // ---------------------------------------------------------------- http
 const clients = new Set();
 const STATIC = { '/app.js': 'application/javascript', '/studio.js': 'application/javascript', '/style.css': 'text/css', '/icon.svg': 'image/svg+xml', '/manifest.json': 'application/manifest+json',
-  '/apple-touch-icon.png': 'image/png', '/icon-192.png': 'image/png', '/icon-512.png': 'image/png', '/fonts/InterVariable.woff2': 'font/woff2' };
+  '/apple-touch-icon.png': 'image/png', '/icon-192.png': 'image/png', '/icon-512.png': 'image/png', '/fonts/InterVariable.woff2': 'font/woff2',
+  '/qr.js': 'application/javascript', '/pair.js': 'application/javascript' };
 const IMMUTABLE = new Set(['/fonts/InterVariable.woff2']);
 const SEC_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; img-src 'self' blob: data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
@@ -946,6 +959,31 @@ const server = http.createServer(async (req, res) => {
       // Back to the page they came from (dashboard or Studio), never to another site.
       const next = /^\/(studio)?$/.test(form.get('next') || '') ? form.get('next') : '/';
       return send(res, 303, 'text/plain', '', { Location: next, 'Set-Cookie': [sessionCookie(req, token, s), `${OLD_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`] });
+    }
+    // The phone scanned a "Connect my phone" QR code: sign it in (kept signed in) and open Phone settings.
+    const pair = url.pathname.match(/^\/pair\/([A-Za-z0-9_-]{20,40})$/);
+    if (pair && req.method === 'GET') {
+      const ip = clientIp(req); const f = fails.get(ip) || { n: 0, until: 0 };
+      if (f.until > Date.now()) return send(res, 303, 'text/plain', '', { Location: '/login?e=locked' });
+      const exp = pairCodes.get(pair[1]); pairCodes.delete(pair[1]);   // works once
+      if (!exp || exp < Date.now()) {
+        f.n++; if (f.n >= 5) { f.until = Date.now() + 15 * 60e3; f.n = 0; }
+        fails.set(ip, f); log('QR sign-in with a used or expired code from', ip);
+        return send(res, 303, 'text/plain', '', { Location: '/login?e=pair' });
+      }
+      const token = crypto.randomBytes(32).toString('hex');
+      const s = { exp: Date.now() + KEEP_MS, keep: true, renewed: Date.now() };
+      sessions.set(token, s); saveSessions(); log('phone signed in with a QR code from', ip);
+      return send(res, 303, 'text/plain', '', { Location: '/?phone=1', 'Set-Cookie': [sessionCookie(req, token, s), `${OLD_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`] });
+    }
+    // The QR page itself, for this PC only (no sign-in: whoever is at the PC already has everything).
+    if (url.pathname === '/pair' || url.pathname === '/pair/new') {
+      const local = !req.headers['x-forwarded-for'] && /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
+      if (!local) return send(res, 404, 'text/plain', 'not found');
+      if (url.pathname === '/pair') return send(res, 200, 'text/html; charset=utf-8', page('pair.html'));
+      if (req.method !== 'POST' || req.headers['x-irlhk'] !== '1') return send(res, 403, 'text/plain', 'bad request');
+      log('QR code for a phone shown on this PC');
+      return send(res, 200, 'application/json', JSON.stringify(newPairLink()));
     }
     if (url.pathname === '/logout') {
       const c = cookies(req); sessions.delete(c[COOKIE]); sessions.delete(c[OLD_COOKIE]); saveSessions();
@@ -1054,6 +1092,11 @@ const server = http.createServer(async (req, res) => {
       tick(); const iv = setInterval(tick, 1000); clients.add(res);
       req.on('close', () => { clearInterval(iv); clients.delete(res); });
       return;
+    }
+    if (url.pathname === '/api/pair' && req.method === 'POST') {
+      if (req.headers['x-irlhk'] !== '1') return send(res, 403, 'text/plain', 'bad request');
+      log('QR code for a phone shown to', clientIp(req));
+      return send(res, 200, 'application/json', JSON.stringify(newPairLink()));
     }
     if (url.pathname === '/api/phone' && req.method === 'GET') {
       if (req.headers['x-irlhk'] !== '1') return send(res, 403, 'text/plain', 'bad request');

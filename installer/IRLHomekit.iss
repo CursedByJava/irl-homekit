@@ -85,6 +85,7 @@ Source: "..\scripts\Connect-Twitch.ps1"; Flags: dontcopy
 Source: "..\templates\relay-vps.sh"; Flags: dontcopy
 
 [Run]
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\Show-PhoneQr.ps1"""; Description: "Show a QR code to set up my phone (scan it with the phone's camera)"; Flags: postinstall nowait skipifsilent runasoriginaluser runhidden; Check: InstallSucceeded and HasRemoteDashboard
 Filename: "{win}\notepad.exe"; Parameters: """{code:GetGuidePath}"""; Description: "Open my phone settings and the last steps (PHONE-SETUP.md)"; Flags: postinstall nowait skipifsilent runasoriginaluser; Check: InstallSucceeded
 Filename: "{code:GetDashboardUrl}"; Description: "Open the dashboard"; Flags: postinstall shellexec nowait skipifsilent runasoriginaluser unchecked; Check: InstallSucceeded
 
@@ -364,6 +365,12 @@ end;
 function InstallSucceeded: Boolean;
 begin
   Result := InstallOk;
+end;
+
+// The QR code needs an address the phone can open (https://...), not "localhost".
+function HasRemoteDashboard: Boolean;
+begin
+  Result := Pos('https://', DashboardUrl) = 1;
 end;
 
 // ------------------------------------------------------------------ what's on this PC

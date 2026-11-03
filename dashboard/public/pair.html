@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IRL Homekit · Connect your phone</title>
+  <link rel="icon" href="/icon.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="pair-page">
+  <main class="pair">
+    <img src="/icon.svg" alt="" width="56" height="56">
+    <h1>Connect your phone</h1>
+    <p class="sub" id="pairSub">Open your phone's camera and point it at this code. Tap the link that appears.</p>
+    <div class="qr" id="qr" aria-live="polite"><div class="empty-note">Making your code…</div></div>
+    <ol class="pair-steps" id="pairSteps">
+      <li>Your phone opens your IRL Homekit dashboard, already signed in.</li>
+      <li>Tap <b>Open in IRL Pro</b> there, and accept the import. IRL Pro is set up.</li>
+      <li>Tip: in the phone's browser menu, <b>Add to Home screen</b>, so the dashboard is one tap away.</li>
+    </ol>
+    <p class="desc" id="pairFoot">The code works once and for 10 minutes. <a href="#" id="pairNew">Make a new one</a></p>
+  </main>
+  <script src="/qr.js"></script>
+  <script src="/pair.js"></script>
+</body>
+</html>

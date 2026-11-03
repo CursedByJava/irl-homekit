@@ -4,6 +4,11 @@ Keep this file private: it has your passwords. (They're also in {{INSTALL_DIR}}\
 
 Four steps, about 5 minutes.
 
+QUICKEST: SCAN A CODE
+---------------------
+On this PC: Start menu > IRL Homekit - Connect my phone. Point your phone's camera at the code and tap the link.
+Your phone opens the dashboard already signed in, with Open in IRL Pro ready: that does Steps 1 and 2 for you.
+
 
 STEP 1. Open the dashboard on your phone
 ----------------------------------------
