@@ -21,6 +21,8 @@ is what the built-in update checker reads.
 - **Set up IRL Pro in one tap.** Dashboard → *Phone settings* → Show → **Open in IRL Pro**: IRL Pro opens and
   offers to import the bonded connection and a backup one, with the server, passphrase and stream ID filled in. No
   typing addresses or passwords on the phone. (Or copy the link and paste it in IRL Pro's *Import Settings*.)
+- **Find your dashboard address any time:** Start menu → *IRL Homekit - Dashboard address* shows it in big type with
+  Copy and Open buttons and how to open it on your phone; it's also on the dashboard (*Home PC*) and in *Status*.
 
 ### Changed
 - **Download button at the top of the README**, and the newest version is now GitHub's "Latest" release, with

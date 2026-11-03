@@ -3,6 +3,11 @@ $root = Split-Path $PSScriptRoot -Parent
 $s = Get-Content "$root\secrets.json" -Raw | ConvertFrom-Json
 $settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json
 
+Write-Host "`n== Dashboard" -ForegroundColor Cyan
+if ($settings.domain) { Write-Host "  https://$($settings.domain)   (on your phone: type it in the browser's address bar)" -ForegroundColor Green }
+else { Write-Host '  http://localhost:8090   (this PC only; Start menu > IRL Homekit - Set up remote dashboard for your phone)' }
+Write-Host '  Copy it, or see it any time: Start menu > IRL Homekit - Dashboard address'
+
 Write-Host "`n== Processes" -ForegroundColor Cyan
 $names = @('obs64', 'mediamtx', 'go-irl', 'noalbs'); if (Test-Path "$root\caddy\Caddyfile") { $names += 'caddy' }
 foreach ($p in $names) {

@@ -74,6 +74,9 @@ $tools = [ordered]@{
 foreach ($name in $tools.Keys) {
     New-Link (Join-Path $folder "IRL Homekit - $name.lnk") 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$InstallDir\scripts\$($tools[$name][0]).ps1`"" $tools[$name][1]
 }
+# A small window, no console.
+New-Link (Join-Path $folder 'IRL Homekit - Dashboard address.lnk') 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$InstallDir\scripts\Show-DashboardAddress.ps1`"" `
+    'Where your dashboard is, with Copy and Open buttons, to get it onto your phone' -Minimized
 
 # Older versions put every tool on the desktop, and had Pause / Resume.
 foreach ($name in 'Status', 'Pause', 'Resume', 'Update scenes', 'Twitch chat token', 'Change login') {

@@ -97,7 +97,7 @@ function dashboard() {
 
   // ---------- rendering
   function render() {
-    renderTop(); renderSignal(); renderStream(); renderScenes(); renderClips(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
+    renderTop(); renderSignal(); renderStream(); renderScenes(); renderClips(); renderAddress(); renderAudio(); renderServices(); renderHistory(); renderUpdate();
   }
 
   function renderTop() {
@@ -224,6 +224,16 @@ function dashboard() {
       b.onclick = () => { if (name !== s.scene) act({ action: 'setScene', scene: name }, 'Switched to ' + name + '.'); };
       return b;
     }));
+  }
+
+  // Where to open the dashboard on the phone (shown once; most useful when this page is open on the PC).
+  function renderAddress() {
+    const a = s.meta.dashboardUrl; if (!a || $('addrText').textContent === a) return;
+    $('addrText').textContent = a; $('addrList').hidden = false;
+    $('addrHint').textContent = /localhost/.test(a)
+      ? 'Only works on the home PC. To use it on your phone: on the PC, Start menu > IRL Homekit - Set up remote dashboard.'
+      : 'On your phone, type it into the browser\'s address bar (not a Google search), then Add to Home screen.';
+    $('addrCopy').onclick = async () => { if (await copyText(a)) toast('success', 'Copied.', a); else toast('error', 'Couldn\'t copy.', 'Press and hold the address to copy it.'); };
   }
 
   let clipsKey = '';

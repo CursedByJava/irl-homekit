@@ -69,7 +69,8 @@ const obs = new Obs(`ws://127.0.0.1:${settings.obsWebsocketPort || 4455}`, secre
 const state = {
   obs: { connected: false }, stream: {}, record: {}, stats: {}, video: {}, scene: '', scenes: [], outputs: [], inputs: [],
   bonded: { online: false }, backup: { online: false }, services: {}, switches: [], updated: 0,
-  meta: { autoScenes: settings.autoScenes || [], audioInputs: settings.audioInputs || {}, baseCollection: settings.baseCollection || '' },
+  meta: { autoScenes: settings.autoScenes || [], audioInputs: settings.audioInputs || {}, baseCollection: settings.baseCollection || '',
+    dashboardUrl: settings.domain ? `https://${settings.domain}` : `http://localhost:${cfg.port || 8090}` },
 };
 let preview = null; let previewAt = 0;
 
