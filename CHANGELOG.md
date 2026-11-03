@@ -30,6 +30,14 @@ is what the built-in update checker reads.
   through it too, with HTTPS end to end and visitors' real addresses for the sign-in limits. The phone guide, Phone
   settings, Status, the dashboard's Home PC checks and DuckDNS all follow the relay. Step by step:
   [docs/RELAY.md](docs/RELAY.md).
+- **Custom destination.** Stream to any RTMP server too (Restream, Facebook, Trovo, your own...): give it a name,
+  server and stream key in Setup. It gets its own switch under **Stream to** on the dashboard, can be added or
+  dropped mid-stream like Kick and YouTube, and carries the main stream when it's the only one on.
+- **Channels are optional.** Skip Twitch, Kick and YouTube in Setup ("Skip for now") and add them later: run Setup
+  again and tick "Also change my channels". Pasting a link works for all three, and YouTube takes your channel's
+  link or @handle (it finds the channel ID for you). Without Twitch, chat commands stay off until you add it.
+- **Setup's DuckDNS page picks up your token by itself** when you copy it on duckdns.org, suggests a name, and
+  checks the name and token with DuckDNS before going on.
 - **Phone settings on the dashboard.** A new card shows everything to enter in IRL Pro (bonded SRTLA server and
   passphrase, backup SRT server and stream ID, RTMP), each with a Copy button, so you can set up or fix the phone from
   anywhere instead of only from `PHONE-SETUP.md` on the PC. It stays hidden until you tap Show (it holds your stream
@@ -41,6 +49,10 @@ is what the built-in update checker reads.
   IRL scenes are rebuilt as usual).
 
 ### Fixed
+- **The IRL Homekit OBS could crash at startup** after an update or an import from your regular OBS: the list of
+  browser panels (the dashboard and Studio docks) could be saved in a form OBS can't read. It's written correctly
+  now, and a broken one is repaired by the update. This also brings back the dashboard and Studio panels where they
+  had gone missing.
 - Status always showed the IP address from install in the IRL Pro settings, even with a DuckDNS name, and kept showing
   the old IP after your home IP changed. It now shows the same address as your phone guide: the DuckDNS name if you
   have one, otherwise your current home IP.

@@ -38,7 +38,7 @@ Home PC ── go-irl (bonded receiver) ──┐
 | ✅ | Bonded cellular + Wi-Fi ingest (SRTLA) | [go-irl](https://github.com/e04/go-irl) |
 | ✅ | Backup SRT / RTMP ingest | [MediaMTX](https://github.com/bluenviron/mediamtx), password protected |
 | ✅ | Auto LIVE / LOW / BRB scenes, `!bitrate` `!start` `!stop` chat commands | [NOALBS](https://github.com/NOALBS/nginx-obs-automatic-low-bitrate-switching) |
-| ✅ | Multistream Twitch + Kick + YouTube without Restream, each switchable on the dashboard | [obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp) |
+| ✅ | Multistream Twitch + Kick + YouTube (+ any custom RTMP destination) without Restream, each switchable on the dashboard | [obs-multi-rtmp](https://github.com/sorayuki/obs-multi-rtmp) |
 | ✅ | Remote control page with live signal, preview, start/stop, scenes, mute | `dashboard/` (Node, no dependencies) |
 | ✅ | Studio page: combined Twitch/Kick/YouTube chat, viewers, title & category everywhere | `dashboard/` + official platform APIs |
 | ✅ | Animated 1080p Starting Soon and Be Right Back screens, live "low bitrate" warning (small, bottom-left) | `overlays/` (OBS browser sources) |
@@ -66,11 +66,14 @@ Nothing else to install: IRL Homekit brings its own copy of Node.js (for the das
 ## Install
 
 **Easiest:** download **`IRL-Homekit-Setup-<version>.exe`** from the [latest release](https://github.com/CursedByJava/irl-homekit/releases)
-and run it. It's a normal setup wizard: your channels, which OBS scenes and overlays to bring over, a dashboard login,
-how your phone reaches the PC (router port forwarding, or a free relay server with no port forwarding), the remote
-dashboard, and start with Windows. Then it installs everything with a progress bar and shows your login and next
-steps. (Setup.exe isn't signed with a paid certificate yet, so Windows may say "unknown publisher": **More info → Run
-anyway**.) Running it again updates IRL Homekit and keeps your settings.
+and run it. It's a normal setup wizard: your channels (all optional: skip them and add them later), an optional
+custom destination, which OBS scenes and overlays to bring over, a dashboard login, how your phone reaches the PC
+(router port forwarding, or a free relay server with no port forwarding), the remote dashboard, and start with
+Windows. Then it installs everything with a progress bar and shows your login and next steps. Running it again
+updates IRL Homekit and keeps your settings, or changes your channels and connection if you tick those boxes.
+(Setup.exe isn't code-signed yet, so Windows may say "unknown publisher": **More info → Run anyway**. On PCs with
+Smart App Control on, Windows can block it outright: then use the source code install below, which does exactly
+the same.)
 Run it while signed in to the Windows account you stream from, and make that an administrator account: if Windows
 asks for a *different* account's password, IRL Homekit gets set up for that account instead.
 
@@ -80,7 +83,7 @@ asks for a *different* account's password, IRL Homekit gets set up for that acco
 2. Open the extracted folder and double-click **`Install IRL Homekit.cmd`**.
    - Windows asks for administrator permission: click **Yes**. (If SmartScreen says "Windows protected your PC",
      click **More info → Run anyway**: the file is a two-line launcher for `install.ps1`, which you can read.)
-   - The installer asks a few questions: your Twitch channel, whether to copy your regular OBS (everything, or just
+   - The installer asks a few questions: your channels (press Enter to skip any), whether to copy your regular OBS (everything, or just
      one scene collection), which chat/alert overlays to show, a dashboard password, whether to start with Windows (yes by default), and whether to set up the
      [remote dashboard](#remote-dashboard).
    - When it's done, IRL Homekit opens.
@@ -200,8 +203,9 @@ One login opens both the dashboard and Studio.
 `https://your-domain` (or `http://localhost:8090` on the PC). Mobile-first and readable outdoors:
 
 - **Phone signal:** bitrate, latency, packet loss, each bonded link, which input is active, in plain words ("Weak: viewers see the LOW SIGNAL banner")
-- **Stream to:** switch Twitch, Kick and YouTube on or off. Off means it never goes live there (no stray notifications);
-  Kick and YouTube can be added or dropped mid-stream.
+- **Stream to:** switch Twitch, Kick, YouTube and your custom destination (any RTMP server, like Restream or
+  Facebook, set up in Setup) on or off. Off means it never goes live there (no stray notifications); all but Twitch
+  can be added or dropped mid-stream.
 - **Stream:** live preview, uptime, outgoing bitrate, dropped frames, live outputs, Start/End with confirmation,
   one-tap 60 / 30 fps switch (while offline)
 - **Scenes:** one tap; auto-switched scenes are labelled

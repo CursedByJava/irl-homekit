@@ -35,6 +35,8 @@ DefaultDirName={code:GetDefaultDir}
 DisableWelcomePage=no
 DisableDirPage=no
 DirExistsWarning=no
+; What install.ps1 downloads and unpacks (OBS, Node.js and the tools), so the folder page shows a real figure.
+ExtraDiskSpaceRequired=1500000000
 DisableProgramGroupPage=yes
 DisableReadyMemo=no
 ; install.ps1 registers IRL Homekit in Settings > Apps with its own uninstaller.
@@ -294,6 +296,7 @@ begin
   Result.Top := Top;
   Result.Caption := Caption;
   Result.Font.Color := ClrBrand;
+  Result.StyleElements := Result.StyleElements - [seFont];   // keep our colour under the dark style
   Result.Font.Style := [fsUnderline];
   Result.Cursor := crHand;
   Result.OnClick := OnClick;
@@ -308,6 +311,7 @@ begin
   Result.Caption := Caption;
   Result.Font.Style := [fsBold];
   Result.Font.Color := Color;
+  Result.StyleElements := Result.StyleElements - [seFont];
 end;
 
 function NewNote(Parent: TWinControl; Left, Top, Width: Integer; Caption: String): TNewStaticText;
@@ -321,6 +325,7 @@ begin
   Result.WordWrap := True;
   Result.Caption := Caption;
   Result.Font.Color := ClrMuted;
+  Result.StyleElements := Result.StyleElements - [seFont];
   Result.AdjustHeight;
 end;
 
