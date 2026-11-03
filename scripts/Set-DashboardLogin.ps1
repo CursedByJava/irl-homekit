@@ -77,8 +77,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not save the new login.' }
 $guide = Join-Path $InstallDir 'PHONE-SETUP.md'
 if (Test-Path $guide) {
     $g = [IO.File]::ReadAllText($guide)
-    $g = $g -replace '(?m)^\| Username \| `[^`]*` \|', ("| Username | ``" + $Username.Replace('$', '$$') + "`` |")
-    $g = $g -replace '(?m)^\| Password \| `[^`]*` \|', ("| Password | ``" + $Password.Replace('$', '$$') + "`` |")
+    $u = $Username.Replace('$', '$$'); $p = $Password.Replace('$', '$$')
+    # Guides from beta.17 on ("    Username:  ...") and older ones (a table).
+    $g = $g -replace '(?m)^(    Username:  ).*?(\r?)$', ('${1}' + $u + '$2') -replace '(?m)^(    Password:  ).*?(\r?)$', ('${1}' + $p + '$2')
+    $g = $g -replace '(?m)^\| Username \| `[^`]*` \|', ("| Username | ``" + $u + "`` |")
+    $g = $g -replace '(?m)^\| Password \| `[^`]*` \|', ("| Password | ``" + $p + "`` |")
     [IO.File]::WriteAllText($guide, $g, (New-Object Text.UTF8Encoding $false))
 }
 

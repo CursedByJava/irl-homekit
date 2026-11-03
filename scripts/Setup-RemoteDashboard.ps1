@@ -128,6 +128,11 @@ if ($mode -in 'duck', 'own', 'off') {
     $guide = "$InstallDir\PHONE-SETUP.md"
     if (Test-Path $guide) {
         $g = [IO.File]::ReadAllText($guide)
+        # Guides from beta.17 on: the address under "type:" in step 1, and the Studio line at the end.
+        $newDash = if ($newDomain) { "https://$newDomain" } else { 'http://localhost:8090 (on this PC only)' }
+        $newStudio = if ($newDomain) { "https://$($settings.studioDomain)" } else { 'http://localhost:8090/studio (on this PC only)' }
+        $g = $g -replace '(tap the address bar at the top and type:\r?\n\r?\n    )[^\r\n]*', ('${1}' + $newDash)
+        $g = $g -replace '(?m)^(Studio \(combined chat, title and category on every platform\): ).*?( \(same login\)\r?)$', ('${1}' + $newStudio + '$2')
         $g = $g -replace '(?m)^\| Dashboard \| \*\*[^*]*\*\* \|', ('| Dashboard | **' + $(if ($newDomain) { "https://$newDomain" } else { 'http://localhost:8090 (on this PC only)' }) + '** |')
         $g = $g -replace '(?m)^\| Studio \| \*\*[^*]*\*\* \|', ('| Studio | **' + $(if ($newDomain) { "https://$($settings.studioDomain)" } else { 'http://localhost:8090/studio (on this PC only)' }) + '** |')
         [IO.File]::WriteAllText($guide, $g, $utf8)

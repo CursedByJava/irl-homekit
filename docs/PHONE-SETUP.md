@@ -1,110 +1,104 @@
-# Your IRL Homekit setup
+IRL HOMEKIT: FINISH ON YOUR PHONE
+=================================
+Keep this file private: it has your passwords. (They're also in {{INSTALL_DIR}}\secrets.json.)
 
-Keep this file private: it contains your stream passwords (also stored in `{{INSTALL_DIR}}\secrets.json`).
+Four steps, about 5 minutes.
 
-## 1. Finish the PC side
 
+STEP 1. Open the dashboard on your phone
+----------------------------------------
+On your phone, open Chrome (or Samsung Internet), tap the address bar at the top and type:
+
+    {{DASHBOARD_URL}}
+
+(Type it in the address bar, not in a Google search.) Sign in with:
+
+    Username:  {{DASHBOARD_USER}}
+    Password:  {{DASHBOARD_PASS}}
+
+Then tap the browser's menu (three dots) > Add to Home screen, so it's one tap next time.
+
+Does the address say "on this PC only"? Then set up the dashboard for your phone first: on this PC, Start menu >
+IRL Homekit - Set up remote dashboard (free, about 5 minutes). Or skip to "Typing the settings by hand" at the bottom.
+
+
+STEP 2. Set up IRL Pro in one tap
+---------------------------------
+On the dashboard (on your phone): Phone settings > Show > Open in IRL Pro. IRL Pro opens and asks to import
+connections: tap yes. That's it: the server, passphrase and backup connection are all filled in.
+
+
+STEP 3. Three phone settings that keep bonding working (Android)
+-----------------------------------------------------------------
+  1. Settings > Apps > IRL Pro > Battery > Unrestricted.
+  2. Settings > Developer options > Mobile data always active > On.
+     (No Developer options? Settings > About phone > Software information > tap Build number 7 times.)
+  3. Samsung: Settings > Connections > Wi-Fi > Intelligent Wi-Fi > Switch to mobile data > Off.
+
+In IRL Pro, on the IRL Homekit (bonded) connection, turn bonding on (mobile data + Wi-Fi).
+Video: 1080p, 60 fps (30 if the phone gets hot), H.265/HEVC, adaptive bitrate on, up to 8000 kbps.
+
+
+STEP 4. Go live
+---------------
+  1. Start streaming in IRL Pro. Within a few seconds the PC switches from Be Right Back to your live camera.
+  2. On the dashboard, tap Start stream (or type !start in your Twitch chat).
+  3. To finish, tap End stream (or !stop). If you only stop IRL Pro, viewers see Be Right Back, and the stream
+     ends by itself after 20 minutes.
+
+Test it once with Wi-Fi off on the phone, to be sure it works away from home.
+
+
+YOUR INTERNET CONNECTION
+------------------------
 <!-- router -->
-1. **Router ports**: {{ROUTER_PORTS}}
-
-   | Protocol | Port | What |
-   |---|---|---|
-   | UDP | 5000 | Bonded phone stream (go-irl / SRTLA) |
-   | UDP | 8890 | Backup phone stream (SRT) |
-   | TCP | 1935 | Backup phone stream (RTMP), optional |
-   | TCP | 443 + 80 | Remote dashboard (only if you set a domain) |
-
-   {{ROUTER_AFTER}}
+{{ROUTER_PORTS}}
+    UDP 5000   bonded phone stream
+    UDP 8890   backup phone stream (SRT)
+    TCP 1935   backup phone stream (RTMP)
+    TCP 443 and 80   the dashboard on your phone (only with a dashboard address)
+{{ROUTER_AFTER}}
 <!-- /router -->
 <!-- relay -->
-1. **Relay server** (no router port forwarding): your phone streams to your relay at `{{RELAY_HOST}}`, and this PC
-   connects out to it (a WireGuard tunnel that starts with Windows). Keep the relay VM running; the tunnel reconnects
-   by itself. If the phone can't connect, check the relay: `docs/RELAY.md` in the IRL Homekit repo (Oracle security
-   list: UDP 5000, 8890, 51820; TCP 1935, 80, 443). The VM's setup script, in case you need to set it up again: `{{INSTALL_DIR}}\relay\relay-vps.sh`
-   (it contains your relay password: keep it private).
+Your phone streams to your relay server at {{RELAY_HOST}}, and this PC connects to it by itself. Keep the relay
+server running. If the phone can't connect, check the relay (docs/RELAY.md in the IRL Homekit repo). Its setup
+script, in case you need to set it up again: {{INSTALL_DIR}}\relay\relay-vps.sh (it has your relay password).
 <!-- /relay -->
-2. **Automatic sign-in** (optional) so IRL Homekit comes back by itself after a reboot or power cut (it opens when you sign in): Win+R → `netplwiz` → untick
-   *"Users must enter a user name and password"* (if the box is missing, first turn off *Settings → Accounts →
-   Sign-in options → "only allow Windows Hello sign-in"*).
-3. **OBS stream key**: open **IRL Homekit** (desktop icon) → in its OBS, *Settings → Stream*: check your Twitch key is there.
-4. **Kick / YouTube (optional, free multistream)**: in the IRL Homekit OBS → *Docks → Multiple output* → edit **Kick** / **YouTube**,
-   paste the server + stream key, tick **enabled**. Leave *sync start* off: IRL Homekit starts and stops them with the
-   main stream, following the dashboard's **Stream to** switches (switch any platform off to skip it).
-5. **Twitch chat commands**: if you didn't sign in with Twitch in Setup, Start menu → **"IRL Homekit - Connect Twitch"**
-   → check the code → **Authorize**. That also puts your Twitch stream key into the IRL Homekit OBS.
-   (Sign out any time: twitch.tv → Settings → Connections → IRL Homekit.)
-6. **Self-test**: `powershell -ExecutionPolicy Bypass -File {{INSTALL_DIR}}\tools\Test-IRLHomekit.ps1`
 
-## 2. Phone — IRL Pro (Android)
 
-### Android settings first
-- *Settings → Apps → IRL Pro → Battery* → **Unrestricted**; allow background data.
-- *Developer options* → **Mobile data always active = ON** (otherwise Android drops 5G while on Wi-Fi and bonding
-  can't use both). Enable Developer options by tapping *Build number* 7 times.
-- Samsung: *Connections → Wi-Fi → Intelligent Wi-Fi* → **Switch to mobile data = OFF**.
+GOOD TO KNOW
+------------
+- Open and close: the IRL Homekit icon on the desktop opens it; closing its OBS window stops everything. It opens
+  by itself when you sign in to Windows (change that on the dashboard: Home PC > Start with Windows).
+- Your dashboard address any time: Start menu > IRL Homekit - Dashboard address.
+- Twitch: if you didn't sign in with Twitch in Setup, Start menu > IRL Homekit - Connect Twitch. That turns on
+  chat commands and puts your stream key in.
+- Kick and YouTube (optional): in the IRL Homekit OBS, Docks > Multiple output > edit Kick or YouTube, paste the
+  server and stream key, tick enabled. The dashboard's Stream to switches turn each one on or off.
+- New password: Start menu > IRL Homekit - Change login (it signs out every device).
+- Comes back after a power cut: Win+R > netplwiz > untick "Users must enter a user name and password" (missing? first
+  turn off Settings > Accounts > Sign-in options > "only allow Windows Hello sign-in").
+- Something not working: Start menu > IRL Homekit - Status, or Save diagnostics for a bug report.
+  Logs: {{INSTALL_DIR}}\logs
 
-**Quickest:** open the dashboard on your phone → **Phone settings** → Show → **Open in IRL Pro**, and accept the
-import. That adds both connections below with everything filled in. (Or copy the link there and paste it in IRL Pro:
-*Settings → Import/Export Settings → Import Settings*.) Then set bonding and video as below.
 
-### Connection 1 — Bonded (main)
-| Field | Value |
-|---|---|
-| Protocol | **SRTLA** |
-| Server | `srtla://{{PHONE_HOST}}:{{PORT_BONDED}}` |
-| Passphrase | `{{GOIRL_PASSPHRASE}}` |
-| Stream ID | (empty) |
-| Latency | `2000` ms (3000–4000 in crowded areas) |
-| Bonding | **ON** — Mobile data + Wi-Fi (+ USB/hotspot) |
+TYPING THE SETTINGS BY HAND (only if Step 2 didn't work)
+--------------------------------------------------------
+In IRL Pro, add a connection:
+    Protocol:    SRTLA
+    Server:      srtla://{{PHONE_HOST}}:{{PORT_BONDED}}
+    Passphrase:  {{GOIRL_PASSPHRASE}}
+    Stream ID:   (leave empty)
+    Latency:     2000 ms (3000-4000 in crowded places)
+    Bonding:     on
+  No passphrase box? Use this as the server: srtla://{{PHONE_HOST}}:{{PORT_BONDED}}?passphrase={{GOIRL_PASSPHRASE}}
 
-No separate passphrase field in your app version? Use `srtla://{{PHONE_HOST}}:{{PORT_BONDED}}?passphrase={{GOIRL_PASSPHRASE}}`.
+Backup connection (no bonding):
+    Protocol:    SRT
+    Server:      srt://{{PHONE_HOST}}:{{PORT_SRT}}
+    Stream ID:   publish:live:{{MEDIAMTX_USER}}:{{MEDIAMTX_PASS}}
+    Latency:     2000 ms
 
-### Connection 2 — Backup (plain SRT, no bonding)
-| Field | Value |
-|---|---|
-| Protocol | **SRT** |
-| Server | `srt://{{PHONE_HOST}}:{{PORT_SRT}}` |
-| Stream ID | `publish:live:{{MEDIAMTX_USER}}:{{MEDIAMTX_PASS}}` |
-| Latency | `2000` ms |
+Last resort (RTMP): rtmp://{{PHONE_HOST}}:{{PORT_RTMP}}/live?user={{MEDIAMTX_USER}}&pass={{MEDIAMTX_PASS}}
 
-Last resort RTMP: `rtmp://{{PHONE_HOST}}:{{PORT_RTMP}}/live?user={{MEDIAMTX_USER}}&pass={{MEDIAMTX_PASS}}`
-
-### Video / audio
-- **1920×1080, 60 fps** (drop to 30 if the phone gets hot or signal is weak — OBS still outputs 60)
-- **H.265 / HEVC**, adaptive bitrate **ON**, max **8000 kbps**, min **500 kbps**, keyframe **1 s**
-- Audio **AAC 48 kHz, 128–160 kbps**
-
-## 3. Going live
-
-1. Start streaming in IRL Pro → OBS on the PC switches from **IRL BRB** to **IRL LIVE** within seconds.
-2. Start the OBS stream from the **dashboard** (Start stream) or type **`!start`** in Twitch chat.
-3. End with **End stream** / **`!stop`**. If you just stop IRL Pro, viewers see BRB and the stream ends by
-   itself after 20 minutes (`offlineTimeout` in `{{INSTALL_DIR}}\noalbs\config.json`).
-
-Signal rules: under **1000 kbps** → *IRL LOW* (banner), under **300 kbps** or disconnected → *IRL BRB*.
-
-## 4. Remote dashboard
-
-| | |
-|---|---|
-| Dashboard | **{{DASHBOARD_URL}}** |
-| Studio | **{{STUDIO_URL}}** |
-| Username | `{{DASHBOARD_USER}}` |
-| Password | `{{DASHBOARD_PASS}}` |
-
-- One login for both pages. You stay signed in for 30 days on each device; after 5 wrong passwords sign-in
-  locks for 15 minutes.
-- **Change your username or password:** Start menu → **IRL Homekit - Change login**. It
-  signs out every device and updates this file.
-- Tip: open the dashboard on your phone and *Add to Home Screen* for an app icon. Let your phone's password
-  manager save the login.
-- Dashboard: phone signal per bonded link, live preview, uptime/bitrate/dropped frames, start/stop, scenes, mute,
-  reload feed/overlays, restart services. Studio: combined chat, viewers, title and category on every platform.
-
-## 5. Everyday
-
-**Open / close:** the **IRL Homekit** desktop icon opens it; closing its OBS window stops everything. It opens by itself
-when you sign in (turn off on the dashboard: Home PC → Start with Windows). Start menu folder *IRL Homekit*:
-**Status**, **Update scenes**, **Import from OBS**, **Connect Twitch**, **Dashboard address**, **Change login**, **Check for updates**,
-**Save diagnostics** (for bug reports), **Uninstall**. IRL Homekit also offers updates by itself when you open it. Logs: `{{INSTALL_DIR}}\logs`. Your public IP today: `{{PUBLIC_IP}}`. If it changes, the Status shortcut tells you what to update (nothing, if you use
-a DuckDNS name with its token, see docs/DOMAIN.md in the repo).
+Studio (combined chat, title and category on every platform): {{STUDIO_URL}} (same login)

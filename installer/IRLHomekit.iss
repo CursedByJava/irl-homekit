@@ -111,6 +111,8 @@ var
   TwitchStatus: TNewStaticText;
   TwitchSignedIn: Boolean;
   CustomCheck: TNewCheckBox;
+  MadePassword, MadeUser: String;
+  CopyPasswordBtn, SaveLoginBtn: TNewButton;
   ObsPage: TWizardPage;
   CollectionCombo, ProfileCombo: TNewComboBox;
   ImportObsCheck: TNewCheckBox;
@@ -423,6 +425,50 @@ begin
   end;
 end;
 
+// Dark background and light text for a text box (the wizard's dark style leaves some of them light grey).
+procedure DarkMemo(M: TNewMemo);
+begin
+  M.StyleElements := M.StyleElements - [seClient, seFont];
+  M.Color := $2E2C2C;          // #2c2c2e
+  M.Font.Color := $F5F5F5;
+end;
+procedure DarkRich(R: TRichEditViewer);
+begin
+  R.StyleElements := R.StyleElements - [seClient, seFont];
+  R.Color := $2E2C2C;
+  R.Font.Color := $F5F5F5;
+end;
+
+// The clipboard, through PowerShell; the text goes in the environment so it never shows up in the process list.
+function CopyText(S: String): Boolean;
+var
+  Code: Integer;
+begin
+  SetEnvironmentVariable('IRLHK_CLIP', S);
+  Result := Exec(PowerShellExe, '-NoProfile -Command "Set-Clipboard -Value $env:IRLHK_CLIP"', '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+  SetEnvironmentVariable('IRLHK_CLIP', '');
+end;
+
+// A password Setup made: copied for you at the end, and you can save the login to a file.
+procedure CopyPasswordClick(Sender: TObject);
+begin
+  if CopyText(MadePassword) then MsgBox('Copied. Paste it into your password manager, or wherever you keep passwords.', mbInformation, MB_OK)
+  else MsgBox('Couldn''t copy it. It''s on this page and in PHONE-SETUP.md in the IRL Homekit folder.', mbError, MB_OK);
+end;
+
+procedure SaveLoginClick(Sender: TObject);
+var
+  FileName: String;
+begin
+  FileName := 'IRL Homekit login.txt';
+  if not GetSaveFileName('Save your IRL Homekit login', FileName, ExpandConstant('{userdesktop}'), 'Text files (*.txt)|*.txt', 'txt') then Exit;
+  if SaveStringToFile(FileName, 'IRL Homekit dashboard login' + #13#10 + #13#10 +
+    'Address:   ' + DashboardUrl + #13#10 + 'Username:  ' + MadeUser + #13#10 + 'Password:  ' + MadePassword + #13#10 + #13#10 +
+    'Keep this file private. Change the password any time: Start menu > IRL Homekit - Change login.' + #13#10, False) then
+    MsgBox('Saved: ' + FileName, mbInformation, MB_OK)
+  else MsgBox('Couldn''t save it there. Try another folder.', mbError, MB_OK);
+end;
+
 procedure OpenOracle(Sender: TObject); begin OpenUrl(OracleUrl); end;
 procedure OpenRelayGuide(Sender: TObject); begin OpenUrl(RelayGuideUrl); end;
 procedure OpenDuckDns(Sender: TObject); begin OpenUrl(DuckDnsUrl); end;
@@ -622,7 +668,7 @@ begin
   LoginGenerate.Caption := 'Make a strong password for me';
   LoginGenerate.Checked := True;   // before OnClick: the password boxes don't exist yet
   LoginGenerate.OnClick := @LoginGenerateClick;
-  L := NewLabel(LoginPage, LoginGenerate.Top + LoginGenerate.Height + ScaleY(4), 'Setup shows it at the end and saves it in PHONE-SETUP.md, so you don''t have to remember it. Or untick this and choose your own (at least 10 characters):');
+  L := NewLabel(LoginPage, LoginGenerate.Top + LoginGenerate.Height + ScaleY(4), 'At the end, Setup shows it, copies it for you and can save it to a file (it''s also in PHONE-SETUP.md). Or untick this and choose your own (at least 10 characters):');
   LoginPass := NewEdit(LoginPage.Surface, L.Top + L.Height + ScaleY(3), ScaleX(220));
   LoginPass.PasswordChar := '*';
   L := NewLabel(LoginPage, LoginPass.Top + LoginPass.Height + ScaleY(8), 'Type it again:');
@@ -726,6 +772,12 @@ begin
 
   SummaryPage := CreateOutputMsgMemoPage(wpInfoAfter, 'Your IRL Homekit', 'Keep this: your dashboard login and what to do next.',
     'Everything below is also in PHONE-SETUP.md in the install folder.', '');
+  // Room for the password buttons (shown only when Setup made the password).
+  SummaryPage.RichEditViewer.Height := SummaryPage.RichEditViewer.Height - ScaleY(36);
+  Y := SummaryPage.RichEditViewer.Top + SummaryPage.RichEditViewer.Height + ScaleY(8);
+  CopyPasswordBtn := NewButton(SummaryPage, 0, Y, ScaleX(130), 'Copy password', @CopyPasswordClick);
+  SaveLoginBtn := NewButton(SummaryPage, ScaleX(138), Y, ScaleX(170), 'Save login to a file...', @SaveLoginClick);
+  CopyPasswordBtn.Visible := False; SaveLoginBtn.Visible := False;
 end;
 
 procedure InitializeWizard;
@@ -745,6 +797,8 @@ begin
   InstallMemo.ScrollBars := ssVertical;
   InstallMemo.Font.Name := 'Consolas';
   InstallMemo.Font.Size := 8;
+  // Text boxes Windows draws itself would otherwise stay light grey with black text in the dark wizard.
+  DarkMemo(InstallMemo); DarkMemo(RelayMemo); DarkRich(SummaryPage.RichEditViewer); DarkMemo(WizardForm.ReadyMemo);
 end;
 
 function ChangingNetwork: Boolean;
@@ -1122,7 +1176,14 @@ begin
     '  ' + ResultValue('dashboardUrl') + NL;
   if ResultValue('studioUrl') <> '' then S := S + '  Studio: ' + ResultValue('studioUrl') + NL;
   S := S + '  Username: ' + ResultValue('username') + NL;
-  if ResultValue('password') <> '' then S := S + '  Password: ' + ResultValue('password') + '   (made for you: save it in your password manager)' + NL
+  MadePassword := ResultValue('password'); MadeUser := ResultValue('username');
+  if MadePassword <> '' then
+  begin
+    // Made for you: copied right away, and the buttons below copy it again or save the login to a file.
+    if CopyText(MadePassword) then S := S + '  Password: ' + MadePassword + '   (made for you, and copied: paste it into your password manager)' + NL
+    else S := S + '  Password: ' + MadePassword + '   (made for you: use the buttons below to copy or save it)' + NL;
+    CopyPasswordBtn.Visible := True; SaveLoginBtn.Visible := True;
+  end
   else S := S + '  Password: the one you chose' + NL;
   S := S + NL + 'PHONE (IRL Pro / Moblin / BELABOX)' + NL +
     '  Your settings are in ' + GuidePath + NL +

@@ -695,12 +695,12 @@ foreach ($kv in ([ordered]@{ '{{PUBLIC_IP}}' = $(if ($public) { $public } else {
     '{{STUDIO_URL}}' = $(if ($Domain) { "https://$studioDomain" } else { 'http://localhost:8090/studio (on this PC only)' })
     '{{PHONE_HOST}}' = $(if ($DuckDnsName -and $s.duckdnsToken) { "$DuckDnsName.duckdns.org" } elseif ($RelayHost) { $RelayHost } elseif ($public) { $public } else { '<your public IP>' })
     '{{RELAY_HOST}}' = $RelayHost
-    '{{ROUTER_PORTS}}' = $(if ($portMapResult.ok -and @($portMapResult.ports | Where-Object { $_.manual })) { "$($portMapResult.message) IRL Homekit keeps the others open while it runs. The ports:" }
-        elseif ($portMapResult.ok) { "IRL Homekit opened these on your router by itself ($($portMapResult.method)) and keeps them open while it runs: nothing to do." }
-        elseif ($portMapResult.message) { "$($portMapResult.message) The ports, all to this PC (``$lan``):" }
-        else { "forward these to this PC (``$lan``). See ``docs/ROUTER.md`` in the IRL Homekit repo for router-by-router steps." })
-    '{{ROUTER_AFTER}}' = $(if ($portMapResult.ok) { "If your phone ever can't connect from outside your home, forward them by hand to this PC (``$lan``): ``docs/ROUTER.md``." }
-        else { "Also give this PC a **DHCP reservation** so it keeps ``$lan``." })
+    '{{ROUTER_PORTS}}' = $(if ($portMapResult.ok -and @($portMapResult.ports | Where-Object { $_.manual })) { "Nothing to do. $($portMapResult.message) IRL Homekit keeps the others open while it runs. The ports:" }
+        elseif ($portMapResult.ok) { "Nothing to do: IRL Homekit opened these on your router by itself and keeps them open while it runs." }
+        elseif ($portMapResult.message) { "One thing to do: $($portMapResult.message)`r`nThe ports, all to this PC ($lan):" }
+        else { "One thing to do: forward these ports on your router to this PC ($lan). Router-by-router steps: docs/ROUTER.md in the IRL Homekit repo." })
+    '{{ROUTER_AFTER}}' = $(if ($portMapResult.ok) { "If your phone ever can't connect from outside your home, forward them by hand to this PC ($lan): docs/ROUTER.md." }
+        else { "Also give this PC a fixed address on the router (a ""DHCP reservation"") so it keeps $lan." })
     '{{DASHBOARD_PASS}}' = $s.dashboardPassword; '{{INSTALL_DIR}}' = $InstallDir }).GetEnumerator()) { $guide = $guide.Replace($kv.Key, $kv.Value) }
 # Keep the router or the relay instructions, whichever applies.
 $drop = if ($RelayHost) { 'router' } else { 'relay' }

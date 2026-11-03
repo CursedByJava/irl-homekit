@@ -11,6 +11,19 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Added
+- **Setup copies the password it made for you**, and its last page has *Copy password* and *Save login to a file*
+  buttons (a text file on your desktop, or wherever you like).
+
+### Changed
+- **The phone guide that opens after Setup (PHONE-SETUP.md) is now four plain steps**: open the dashboard on your
+  phone, tap *Open in IRL Pro*, three Android settings, go live. No tables or symbols, so it reads well in Notepad;
+  the full settings for typing in by hand are at the bottom.
+
+### Fixed
+- **Setup's last page (and its other text boxes) were light grey with black text** in the dark wizard: now dark,
+  like the rest.
+
 ## [1.0.0-beta.16] - 2026-11-03
 
 ### Changed
