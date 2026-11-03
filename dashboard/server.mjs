@@ -79,10 +79,12 @@ let preview = null; let previewAt = 0;
 // that are on are started through obs-multi-rtmp's per-target hotkeys when the main stream starts, and stopped with
 // it; platforms that are off are never started (no stray "went live" notifications). Their own auto-start
 // ("sync-start") is switched off by the installer, so IRL Homekit decides.
-const PLATFORMS = ['twitch', 'kick', 'youtube'];
-const PLATFORM_NAMES = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' };
+// "custom" is your own extra destination (any RTMP server: Restream, Facebook, your own...), obs-multi-rtmp target 1003.
+const PLATFORMS = ['twitch', 'kick', 'youtube', 'custom'];
+const CUSTOM_TARGET = '1003';
+const PLATFORM_NAMES = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube', custom: 'Custom' };
 const profileDir = () => path.join(settings.obsConfigDir || '', 'basic', 'profiles', String(settings.obsProfile || 'IRL Homekit').replace(/[^A-Za-z0-9_-]/g, '_'));
-settings.streamTo = { twitch: true, kick: true, youtube: true, ...(settings.streamTo || {}) };
+settings.streamTo = { twitch: true, kick: true, youtube: true, custom: true, ...(settings.streamTo || {}) };
 const extraLive = new Set();   // multi-rtmp targets IRL Homekit started for the current stream
 
 function saveSettings() {
@@ -103,8 +105,9 @@ function endpoints() {
   if (secrets.streamTwitch?.settings?.key) ep.twitch = { main: { type: secrets.streamTwitch.type, settings: secrets.streamTwitch.settings } };
   try {
     for (const t of readJson(path.join(profileDir(), 'obs-multi-rtmp.json')).targets || []) {
-      const p = PLATFORMS.find((x) => new RegExp(PLATFORM_NAMES[x], 'i').test(t.name || ''));
-      if (p && p !== 'twitch' && t['service-param']?.key) {
+      const p = String(t.id) === CUSTOM_TARGET ? 'custom' : PLATFORMS.find((x) => x !== 'custom' && new RegExp(PLATFORM_NAMES[x], 'i').test(t.name || ''));
+      if (p === 'custom') PLATFORM_NAMES.custom = t.name || 'Custom';   // shown as you named it
+      if (p && p !== 'twitch' && t['service-param']?.key && t['service-param']?.server) {
         ep[p] = { id: t.id, main: { type: 'rtmp_custom', settings: { server: t['service-param'].server, key: t['service-param'].key, use_auth: false } } };
       }
     }
@@ -114,7 +117,8 @@ function endpoints() {
 function primaryPlatform(ep = endpoints()) { return PLATFORMS.find((p) => settings.streamTo[p] && ep[p]) || null; }
 function platformState() {
   const ep = endpoints(), primary = primaryPlatform(ep);
-  state.platformsOut = { primary, list: PLATFORMS.map((p) => ({ id: p, name: PLATFORM_NAMES[p], on: !!settings.streamTo[p], ready: !!ep[p],
+  // The custom destination only shows once it's set up (Setup, or OBS > Docks > Multiple output).
+  state.platformsOut = { primary, list: PLATFORMS.filter((p) => p !== 'custom' || ep.custom).map((p) => ({ id: p, name: PLATFORM_NAMES[p], on: !!settings.streamTo[p], ready: !!ep[p],
     live: !!state.stream?.active && (p === primary || extraLive.has(p)) })) };
 }
 // Point OBS's main output at the first platform that's on. Only possible while not streaming.
@@ -131,7 +135,7 @@ async function applyMainOutput() {
 }
 async function startExtras() {
   const ep = endpoints(), primary = primaryPlatform(ep);
-  for (const p of ['kick', 'youtube']) {
+  for (const p of ['kick', 'youtube', 'custom']) {
     if (p === primary || !settings.streamTo[p] || !ep[p] || extraLive.has(p)) continue;
     await obs.req('TriggerHotkeyByName', { hotkeyName: `obs-multi-rtmp.start.${ep[p].id}` }).then(() => { extraLive.add(p); log('started', PLATFORM_NAMES[p]); }, (e) => log('could not start', p, e.message));
   }

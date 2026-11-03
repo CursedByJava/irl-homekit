@@ -35,8 +35,14 @@ param(
     [switch] $ImportObs,
     [string[]] $OverlaySources = @(),
     [string] $BrbBackground = '',
+    # Channels are all optional: leave them empty to add them later (run Setup again). 'none' removes one on an update.
     [string] $KickChannel = '',
+    # Your YouTube channel: its ID (UC...), its link, or its @handle.
     [string] $YoutubeChannelId = '',
+    # Your own extra destination (any RTMP server: Restream, Facebook, your own...), streamed to alongside the others.
+    # Its stream key comes from the environment (IRLHK_CUSTOM_KEY), never the command line. -CustomServer off removes it.
+    [string] $CustomName = '',
+    [string] $CustomServer = '',
     # Dashboard username on first install (default: your Twitch channel). The password is asked for, never passed.
     [string] $DashboardUser = '',
     # Free DuckDNS name to keep pointed at this PC's home IP (see docs/DOMAIN.md). Taken from -Domain when it's a duckdns.org name.
@@ -62,7 +68,7 @@ if ($AnswersFile) {
             { $_ -in 'ImportObs', 'NonInteractive' } { Set-Variable $p.Name ([switch][bool]$p.Value); break }
             'OverlaySources' { $OverlaySources = @($p.Value | Where-Object { $_ }); break }
             { $_ -in 'InstallDir', 'TwitchChannel', 'Domain', 'BaseCollection', 'BaseProfile', 'AutoStart', 'KickChannel', 'YoutubeChannelId',
-                'DashboardUser', 'DuckDnsName', 'RelayHost', 'BrbBackground' } { Set-Variable $p.Name ([string]$p.Value); break }
+                'DashboardUser', 'DuckDnsName', 'RelayHost', 'BrbBackground', 'CustomName', 'CustomServer' } { Set-Variable $p.Name ([string]$p.Value); break }
             default { Write-Warning "answers file: ignoring unknown setting '$($p.Name)'" }
         }
     }
@@ -183,7 +189,7 @@ $collections = @(Get-ChildItem $scenesDir -Filter *.json -ErrorAction SilentlyCo
 $profiles = @(Get-ChildItem (Join-Path $BaseObsConfigDir 'basic\profiles') -Directory -ErrorAction SilentlyContinue | ForEach-Object {
     (Get-Content "$($_.FullName)\basic.ini" -ErrorAction SilentlyContinue | Where-Object { $_ -like 'Name=*' } | Select-Object -First 1) -replace '^Name=' } | Where-Object { $_ -and $_ -ne $ObsName })
 
-if (-not $TwitchChannel) { $TwitchChannel = Ask 'Your Twitch channel name (used for chat commands)' }
+if (-not $prev -and -not $TwitchChannel) { $TwitchChannel = Ask 'Your Twitch channel name, for chat commands (Enter = skip, add it later)' }
 if (-not $prev -and -not $BaseCollection -and $collections) {
     Info ('Your OBS scene collections: ' + ($collections -join ', '))
     $BaseCollection = Ask 'Copy which collection for your overlays/scenes? (Enter = start empty)'
@@ -207,8 +213,28 @@ if (-not $ImportObs -and ($collections -or $profiles) -and -not (Test-Path "$Ins
     $ImportObs = (Ask 'Import everything from your regular OBS? (y/N)' 'N') -match '^y'
 }
 if (-not $prev -and -not $KickChannel) { $KickChannel = Ask 'Your Kick channel name (Enter = same as Twitch, or none)' $TwitchChannel }
-if ($KickChannel -eq 'none') { $KickChannel = '' }
-if (-not $prev -and -not $YoutubeChannelId) { $YoutubeChannelId = Ask 'Your YouTube channel ID, starts with UC (Enter = skip)' }
+if (-not $prev -and -not $YoutubeChannelId) { $YoutubeChannelId = Ask 'Your YouTube channel: link, @handle or ID (Enter = skip)' }
+foreach ($n in 'TwitchChannel', 'KickChannel', 'YoutubeChannelId') { if ((Get-Variable $n -ValueOnly) -eq 'none') { Set-Variable $n '' } }
+$TwitchChannel = "$TwitchChannel".Trim() -replace '^(https?://)?(www\.)?twitch\.tv/', '' -replace '[/?].*$', ''
+$KickChannel = "$KickChannel".Trim() -replace '^(https?://)?(www\.)?kick\.com/', '' -replace '[/?].*$', ''
+if ("$CustomServer".Trim() -and "$CustomServer".Trim() -ne 'off' -and "$CustomServer".Trim() -notmatch '^rtmps?://[^\s/]+') { throw "Custom destination '$CustomServer' isn't an RTMP address (rtmp://... or rtmps://...)." }
+# YouTube: a link or @handle becomes the channel ID (UC...), read from the channel page's canonical link.
+$YoutubeChannelId = "$YoutubeChannelId".Trim()
+if ($YoutubeChannelId -and $YoutubeChannelId -notmatch '^UC[\w-]{22}$') {
+    $ytId = [regex]::Match($YoutubeChannelId, 'youtube\.com/channel/(UC[\w-]{22})').Groups[1].Value
+    if (-not $ytId) {
+        $ytUrl = if ($YoutubeChannelId -match '^https?://') { $YoutubeChannelId } elseif ($YoutubeChannelId -match '^@') { "https://www.youtube.com/$YoutubeChannelId" } else { "https://www.youtube.com/@$YoutubeChannelId" }
+        try {
+            $page = (Invoke-WebRequest $ytUrl -UseBasicParsing -TimeoutSec 20 -Headers @{ 'Accept-Language' = 'en-US' } -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)').Content
+            $ytId = [regex]::Match($page, '<link rel="canonical" href="https://www\.youtube\.com/channel/(UC[\w-]{22})"').Groups[1].Value
+        } catch { }
+    }
+    if ($ytId) { Info "YouTube channel: $ytId"; $YoutubeChannelId = $ytId }
+    else {
+        $m = "Couldn't find the YouTube channel '$YoutubeChannelId', so it was skipped. Add it later by running Setup again (paste your channel's link)."
+        $result.warnings += $m; Write-Warning $m; $YoutubeChannelId = ''
+    }
+}
 # Remote dashboard (reach it from your phone anywhere): the guided setup runs at the end of the install, once
 # IRL Homekit is open, so it can check DNS, router ports and the HTTPS certificate for you.
 $setupRemote = $false
@@ -384,7 +410,7 @@ $settings = [ordered]@{
     phoneInputs = @('IRL Phone (Bonded)', 'IRL Phone (Backup)'); overlayInputs = @($OverlaySources); audioInputs = $audio
     autoScenes = @('IRL LIVE', 'IRL LOW', 'IRL BRB', 'IRL LIVE (Backup)', 'IRL LOW (Backup)')
     studioDomain = $studioDomain; duckdnsName = $DuckDnsName; relayHost = $RelayHost; baseCollection = $BaseCollection; brbBackground = $BrbBackground; kickChannel = $KickChannel.ToLower(); youtubeChannelId = $YoutubeChannelId
-    streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true } })   # dashboard's "Stream to" switches
+    streamTo = $(if ($prev.streamTo) { $prev.streamTo } else { [ordered]@{ twitch = $true; kick = $true; youtube = $true; custom = $true } })   # dashboard's "Stream to" switches
 }
 Write-Utf8 "$InstallDir\settings.json" ($settings | ConvertTo-Json -Depth 5)
 
@@ -436,7 +462,8 @@ Step 4 'Configuring NOALBS (automatic LIVE / LOW / BRB switching)'
 $sceneOrNull = { param($n) if ($n -and $baseScenes -contains $n) { '"' + $n + '"' } else { 'null' } }
 $starting = @('Starting Soon', 'Starting') | Where-Object { $baseScenes -contains $_ } | Select-Object -First 1
 $ending = @('Ending', 'Ending Soon', 'End') | Where-Object { $baseScenes -contains $_ } | Select-Object -First 1
-$cfg = [IO.File]::ReadAllText("$repo\templates\noalbs.config.json").Replace('{{TWITCH_CHANNEL}}', $TwitchChannel.ToLower()).Replace('{{OBS_WS_PASSWORD}}', $s.obsWebsocketPassword).Replace('"{{OBS_WS_PORT}}"', "$ObsWsPort")
+# NOALBS needs a name for its user even without Twitch (chat commands stay off until Twitch is connected).
+$cfg = [IO.File]::ReadAllText("$repo\templates\noalbs.config.json").Replace('{{TWITCH_CHANNEL}}', $(if ($TwitchChannel) { $TwitchChannel.ToLower() } else { 'irlhomekit' })).Replace('{{OBS_WS_PASSWORD}}', $s.obsWebsocketPassword).Replace('"{{OBS_WS_PORT}}"', "$ObsWsPort")
 $cfg = $cfg.Replace('"{{STARTING_SCENE}}"', (& $sceneOrNull $starting)).Replace('"{{ENDING_SCENE}}"', (& $sceneOrNull $ending))
 $noalbsCfg = "$InstallDir\noalbs\config.json"
 if ((Test-Path $noalbsCfg) -and -not (Test-Path "$noalbsCfg.original")) { Copy-Item $noalbsCfg "$noalbsCfg.original" }
@@ -516,6 +543,22 @@ if (-not (Test-Path $mr)) { Copy-Item "$repo\templates\obs-multi-rtmp.json" $mr 
 # IRL Homekit starts Kick / YouTube itself, following the dashboard's "Stream to" switches, so the plugin must not
 # start them on its own with the main stream (OBS is closed here, so this edit sticks).
 $mrCfg = Get-Content $mr -Raw | ConvertFrom-Json
+# Your own extra destination (any RTMP server) is target 1003; the dashboard shows it under "Stream to" once it has a key.
+$CustomServer = "$CustomServer".Trim()
+if ($CustomServer -eq 'off') {
+    $mrCfg.targets = @($mrCfg.targets | Where-Object { "$($_.id)" -ne '1003' }); Info 'custom destination removed'
+} elseif ($CustomServer) {
+    if ($CustomServer -notmatch '^rtmps?://[^\s/]+') { throw "Custom destination '$CustomServer' isn't an RTMP address (rtmp://... or rtmps://...)." }
+    $ct = @($mrCfg.targets) | Where-Object { "$($_.id)" -eq '1003' } | Select-Object -First 1
+    if (-not $ct) {
+        $ct = ([IO.File]::ReadAllText("$repo\templates\obs-multi-rtmp.json") | ConvertFrom-Json).targets | Where-Object { "$($_.id)" -eq '1003' }
+        $mrCfg.targets = @($mrCfg.targets) + $ct
+    }
+    $ct.name = $(if ("$CustomName".Trim()) { "$CustomName".Trim() } elseif ($ct.name) { $ct.name } else { 'Custom' })
+    $ct.'service-param'.server = $CustomServer
+    if ($env:IRLHK_CUSTOM_KEY) { $ct.'service-param'.key = $env:IRLHK_CUSTOM_KEY.Trim() }
+    Info "custom destination: $($ct.name) ($CustomServer)$(if (-not $ct.'service-param'.key) { ' - add its stream key in OBS > Docks > Multiple output' })"
+}
 foreach ($t in @($mrCfg.targets)) { $t.'sync-start' = $false; $t.'sync-stop' = $false; if ($t.'service-param'.key) { $t.enabled = $true } }
 Write-Utf8 $mr ($mrCfg | ConvertTo-Json -Depth 10)
 

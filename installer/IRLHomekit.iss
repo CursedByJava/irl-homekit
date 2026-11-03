@@ -6,6 +6,9 @@
 ; install IRL Homekit the same way.
 ;
 ; Build (Inno Setup 6.3 or newer):  iscc installer\IRLHomekit.iss          -> installer\Output\IRL-Homekit-Setup-<version>.exe
+; Test build:  iscc /DTestInstallDir=C:\Temp\irlhk-test /DOutputName=Test installer\IRLHomekit.iss  installs into that folder
+; with install.ps1 -SkipSystem (no tasks, shortcuts, firewall rules or Apps entry), so the whole wizard can be run on a PC
+; that already has IRL Homekit.
 ; The release workflow (.github/workflows/release.yml) builds it and attaches it to every GitHub release.
 
 #ifndef AppVersion
@@ -43,10 +46,20 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 CloseApplications=no
 RestartApplications=no
-WizardStyle=modern
+; IRL Homekit's look: dark (like the dashboard and the IRL Homekit OBS), the logo's gradient on the first and last
+; pages and the app icon on the others. installer\images\Make-SetupImages.ps1 draws the images from the logo.
+WizardStyle=modern dark windows11 includetitlebar hidebevels
+WizardBackColor=#1c1c1e
+WizardImageFile=images\wizard-202.png,images\wizard-336.png,images\wizard-430.png,images\wizard-534.png
+WizardImageBackColor=#d4145a
+WizardSmallImageFile=images\small-58.png,images\small-87.png,images\small-116.png,images\small-145.png
 SetupIconFile=..\dashboard\public\icon.ico
 OutputDir=Output
+#ifdef OutputName
+OutputBaseFilename=IRL-Homekit-Setup-{#AppVersion}-{#OutputName}
+#else
 OutputBaseFilename=IRL-Homekit-Setup-{#AppVersion}
+#endif
 Compression=lzma2/max
 SolidCompression=yes
 SetupLogging=yes
@@ -61,7 +74,7 @@ ClickFinish=Click Finish to close Setup.
 
 [Files]
 ; The whole app, unpacked to a temporary folder for install.ps1 (which copies what it needs into the install folder).
-Source: "..\*"; Excludes: ".git,.github,\installer\Output,\docs\images"; DestDir: "{tmp}\src"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "..\*"; Excludes: ".git,.github,\installer\Output,\installer\images,\docs\images"; DestDir: "{tmp}\src"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; Needed before the pages are shown.
 Source: "Get-SetupInfo.ps1"; Flags: dontcopy
 Source: "..\templates\relay-vps.sh"; Flags: dontcopy
@@ -87,7 +100,9 @@ var
   DashboardUrl, GuidePath: String;
 
   UpdatePage: TInputOptionWizardPage;
-  ChannelsPage: TInputQueryWizardPage;
+  ChannelsPage, CustomPage: TWizardPage;
+  TwitchEdit, KickEdit, YoutubeEdit, CustomNameEdit, CustomServerEdit, CustomKeyEdit: TNewEdit;
+  CustomKeyHint: TNewStaticText;
   ObsPage: TWizardPage;
   CollectionCombo, ProfileCombo: TNewComboBox;
   ImportObsCheck: TNewCheckBox;
@@ -105,12 +120,69 @@ var
   DuckNameEdit, DuckTokenEdit, DomainEdit: TNewEdit;
   DuckPanel, DomainPanel: TPanel;
   DuckTokenHint: TNewStaticText;
+  DuckTimer: Longword;
   OptionsPage: TInputOptionWizardPage;
   InstallMemo: TNewMemo;
   SummaryPage: TOutputMsgMemoWizardPage;
 
 function SetEnvironmentVariable(lpName, lpValue: String): Boolean;
   external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+function SendMessageStr(hWnd: HWND; Msg: Cardinal; wParam: Longint; lParam: String): Longint;
+  external 'SendMessageW@user32.dll stdcall';
+// Clipboard (the DuckDNS token is picked up from it) and a timer to check it while that page is open.
+function OpenClipboard(hWndNewOwner: HWND): Boolean; external 'OpenClipboard@user32.dll stdcall';
+function CloseClipboard: Boolean; external 'CloseClipboard@user32.dll stdcall';
+function GetClipboardData(uFormat: Cardinal): Longword; external 'GetClipboardData@user32.dll stdcall';
+function GlobalLock(hMem: Longword): Longword; external 'GlobalLock@kernel32.dll stdcall';
+function GlobalUnlock(hMem: Longword): Boolean; external 'GlobalUnlock@kernel32.dll stdcall';
+function lstrlenW(lpString: Longword): Integer; external 'lstrlenW@kernel32.dll stdcall';
+function lstrcpynW(lpString1: String; lpString2: Longword; iMaxLength: Integer): Longword; external 'lstrcpynW@kernel32.dll stdcall';
+function SetTimer(hWnd: HWND; nIDEvent, uElapse: Cardinal; lpTimerFunc: Longword): Cardinal; external 'SetTimer@user32.dll stdcall';
+function KillTimer(hWnd: HWND; uIDEvent: Cardinal): Boolean; external 'KillTimer@user32.dll stdcall';
+
+const
+  EM_SETCUEBANNER = $1501;
+  CF_UNICODETEXT = 13;
+  // Brand and platform colours ($bbggrr).
+  ClrBrand = $552DFF;     // #FF2D55
+  ClrMuted = $A0A0A0;
+  ClrTwitch = $FF70A9;    // #A970FF
+  ClrKick = $18FC53;      // #53FC18
+  ClrYouTube = $454EFF;   // #FF4E45
+
+// Grey placeholder text inside an empty box.
+procedure Hint(E: TNewEdit; Text: String);
+begin
+  SendMessageStr(E.Handle, EM_SETCUEBANNER, 1, Text);
+end;
+
+function ClipboardText: String;
+var
+  H, P: Longword;
+  N: Integer;
+begin
+  Result := '';
+  if not OpenClipboard(0) then Exit;
+  try
+    H := GetClipboardData(CF_UNICODETEXT);
+    if H = 0 then Exit;
+    P := GlobalLock(H);
+    if P = 0 then Exit;
+    try
+      N := lstrlenW(P);
+      if (N > 0) and (N < 4096) then
+      begin
+        Result := StringOfChar(' ', N + 1);
+        lstrcpynW(Result, P, N + 1);
+        Result := Copy(Result, 1, N);
+      end;
+    finally
+      GlobalUnlock(H);
+    end;
+  finally
+    CloseClipboard;
+  end;
+end;
 
 // ------------------------------------------------------------------ small helpers
 function PowerShellExe: String;
@@ -213,9 +285,52 @@ begin
   Result.OnClick := OnClick;
 end;
 
+// A clickable text link in the brand colour.
+function NewLink(Parent: TWinControl; Left, Top: Integer; Caption: String; OnClick: TNotifyEvent): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(Parent);
+  Result.Parent := Parent;
+  Result.Left := Left;
+  Result.Top := Top;
+  Result.Caption := Caption;
+  Result.Font.Color := ClrBrand;
+  Result.Font.Style := [fsUnderline];
+  Result.Cursor := crHand;
+  Result.OnClick := OnClick;
+end;
+
+// A platform's name in its own colour, bold.
+function NewTitle(Parent: TWinControl; Top: Integer; Caption: String; Color: Integer): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(Parent);
+  Result.Parent := Parent;
+  Result.Top := Top;
+  Result.Caption := Caption;
+  Result.Font.Style := [fsBold];
+  Result.Font.Color := Color;
+end;
+
+function NewNote(Parent: TWinControl; Left, Top, Width: Integer; Caption: String): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(Parent);
+  Result.Parent := Parent;
+  Result.Left := Left;
+  Result.Top := Top;
+  Result.Width := Width;
+  Result.AutoSize := False;
+  Result.WordWrap := True;
+  Result.Caption := Caption;
+  Result.Font.Color := ClrMuted;
+  Result.AdjustHeight;
+end;
+
 // ------------------------------------------------------------------ install folder
 function GetDefaultDir(Param: String): String;
 begin
+#ifdef TestInstallDir
+  // Test builds only (iscc /DTestInstallDir=<folder>): install there, without the system changes (see RunInstall).
+  Result := '{#TestInstallDir}'; Exit;
+#endif
   // install.ps1 records the folder for Settings > Apps.
   if not RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\IRLHomekit', 'InstallLocation', Result) or (Result = '') then
     Result := 'C:\IRLHomekit';
@@ -300,6 +415,44 @@ end;
 procedure OpenOracle(Sender: TObject); begin OpenUrl(OracleUrl); end;
 procedure OpenRelayGuide(Sender: TObject); begin OpenUrl(RelayGuideUrl); end;
 procedure OpenDuckDns(Sender: TObject); begin OpenUrl(DuckDnsUrl); end;
+// Where each platform shows your name (Twitch and Kick put it in the address once you're signed in; YouTube shows
+// the channel ID with a copy button).
+procedure OpenTwitch(Sender: TObject); begin OpenUrl('https://dashboard.twitch.tv/'); end;
+procedure OpenKick(Sender: TObject); begin OpenUrl('https://kick.com/dashboard'); end;
+procedure OpenYoutube(Sender: TObject); begin OpenUrl('https://www.youtube.com/account_advanced'); end;
+
+procedure SkipChannels(Sender: TObject);
+begin
+  TwitchEdit.Text := ''; KickEdit.Text := ''; YoutubeEdit.Text := '';
+  WizardForm.NextButton.OnClick(WizardForm.NextButton);
+end;
+
+procedure SkipCustom(Sender: TObject);
+begin
+  CustomNameEdit.Text := ''; CustomServerEdit.Text := ''; CustomKeyEdit.Text := '';
+  WizardForm.NextButton.OnClick(WizardForm.NextButton);
+end;
+
+// DuckDNS token: 36 characters, like 8 hex - 4 - 4 - 4 - 12.
+function IsDuckToken(S: String): Boolean;
+begin
+  S := Lowercase(Trim(S));
+  Result := (Length(S) = 36) and OnlyChars(S, '0123456789abcdef-') and (S[9] = '-') and (S[14] = '-') and (S[19] = '-') and (S[24] = '-');
+end;
+
+// While the DuckDNS page is open: a token copied on duckdns.org fills itself in.
+procedure DuckClipboardTick(H: Longword; Msg: Longword; IdEvent: Longword; Time: Longword);
+var
+  S: String;
+begin
+  S := Trim(ClipboardText);
+  if IsDuckToken(S) and (Lowercase(S) <> Lowercase(Trim(DuckTokenEdit.Text))) then
+  begin
+    DuckTokenEdit.Text := Lowercase(S);
+    DuckTokenHint.Caption := 'Got your token from the clipboard.';
+    DuckTokenHint.Font.Color := ClrKick;
+  end;
+end;
 
 procedure LoginGenerateClick(Sender: TObject);
 begin
@@ -323,15 +476,61 @@ begin
     'Make sure you are not live: IRL Homekit closes during the update and opens again when it''s done.',
     False, False);
   UpdatePage.Add('Also change how my phone and the dashboard connect (port forwarding or relay server, remote dashboard)');
+  UpdatePage.Add('Also change my channels and stream destinations (Twitch, Kick, YouTube, custom)');
 
-  ChannelsPage := CreateInputQueryPage(wpSelectDir, 'Your channels',
-    'Where you stream.', 'Twitch is used for chat commands (!start, !stop) and the dashboard. Kick and YouTube are optional; you can add their stream keys in OBS later.');
-  ChannelsPage.Add('Twitch channel name:', False);
-  ChannelsPage.Add('Kick channel name (leave empty if you don''t stream on Kick):', False);
-  ChannelsPage.Add('YouTube channel ID, starts with UC (optional):', False);
+  // Channels: all optional. Skipped ones can be added any time by running Setup again.
+  ChannelsPage := CreateCustomPage(wpSelectDir, 'Your channels', 'All optional: skip any of them and add them later by running Setup again.');
+  Y := 0;
+  NewTitle(ChannelsPage.Surface, Y, 'Twitch', ClrTwitch);
+  NewLink(ChannelsPage.Surface, ScaleX(70), Y, 'Open my Twitch', @OpenTwitch);
+  TwitchEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
+  Hint(TwitchEdit, 'your Twitch name');
+  TwitchEdit.Text := InfoValue('prev', 'twitchChannel');
+  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Chat commands (!start, !stop) and Studio.');
+  Y := Y + ScaleY(54);
+  NewTitle(ChannelsPage.Surface, Y, 'Kick', ClrKick);
+  NewLink(ChannelsPage.Surface, ScaleX(70), Y, 'Open my Kick', @OpenKick);
+  KickEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
+  Hint(KickEdit, 'your Kick name');
+  KickEdit.Text := InfoValue('prev', 'kickChannel');
+  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Live status and chat in Studio.');
+  Y := Y + ScaleY(54);
+  NewTitle(ChannelsPage.Surface, Y, 'YouTube', ClrYouTube);
+  NewLink(ChannelsPage.Surface, ScaleX(70), Y, 'Find my channel', @OpenYoutube);
+  YoutubeEdit := NewEdit(ChannelsPage.Surface, Y + ScaleY(17), ScaleX(240));
+  Hint(YoutubeEdit, 'channel link, @handle or ID');
+  YoutubeEdit.Text := InfoValue('prev', 'youtubeChannelId');
+  NewNote(ChannelsPage.Surface, ScaleX(252), Y + ScaleY(17), ChannelsPage.SurfaceWidth - ScaleX(252), 'Paste the link from your browser.');
+  Y := Y + ScaleY(58);
+  NewNote(ChannelsPage.Surface, 0, Y, ChannelsPage.SurfaceWidth,
+    'Stream keys go into the IRL Homekit OBS later. Chat, titles and viewers connect in Studio (its Connect buttons).');
+  NewLink(ChannelsPage.Surface, 0, ChannelsPage.SurfaceHeight - ScaleY(16), 'Skip for now', @SkipChannels);
+
+  // Your own extra destination: any RTMP server, streamed to alongside the others.
+  CustomPage := CreateCustomPage(ChannelsPage.ID, 'Custom destination', 'Optional: also stream to another service or your own server.');
+  L := NewNote(CustomPage.Surface, 0, 0, CustomPage.SurfaceWidth,
+    'Any RTMP server works, like Restream, Facebook, Trovo or your own. It gets its own switch under Stream to on the dashboard.');
+  Y := L.Top + L.Height + ScaleY(10);
+  NewTitle(CustomPage.Surface, Y, 'Name', ClrBrand);
+  CustomNameEdit := NewEdit(CustomPage.Surface, Y + ScaleY(17), ScaleX(240));
+  Hint(CustomNameEdit, 'e.g. Restream');
+  CustomNameEdit.Text := InfoValue('prev', 'customName');
+  Y := Y + ScaleY(50);
+  NewTitle(CustomPage.Surface, Y, 'Server (RTMP URL)', ClrBrand);
+  CustomServerEdit := NewEdit(CustomPage.Surface, Y + ScaleY(17), CustomPage.SurfaceWidth);
+  Hint(CustomServerEdit, 'rtmp://live.example.com/app');
+  CustomServerEdit.Text := InfoValue('prev', 'customServer');
+  Y := Y + ScaleY(50);
+  NewTitle(CustomPage.Surface, Y, 'Stream key', ClrBrand);
+  CustomKeyEdit := NewEdit(CustomPage.Surface, Y + ScaleY(17), CustomPage.SurfaceWidth);
+  CustomKeyEdit.PasswordChar := '*';
+  Hint(CustomKeyEdit, 'from that service''s settings');
+  CustomKeyHint := NewNote(CustomPage.Surface, 0, Y + ScaleY(42), CustomPage.SurfaceWidth, '');
+  if InfoValue('prev', 'hasCustomKey') = '1' then begin CustomKeyHint.Caption := 'Leave empty to keep the stream key you entered before.'; CustomKeyHint.AdjustHeight; end;
+  NewLink(CustomPage.Surface, 0, CustomPage.SurfaceHeight - ScaleY(16), 'Skip for now', @SkipCustom);
 
   // Your regular OBS: what to start from.
-  ObsPage := CreateCustomPage(ChannelsPage.ID, 'Your OBS', 'IRL Homekit runs its own copy of OBS. Choose what it starts with.');
+  ObsPage := CreateCustomPage(CustomPage.ID, 'Your OBS', 'IRL Homekit runs its own copy of OBS. Choose what it starts with.');
   L := NewLabel(ObsPage, 0, 'Scenes and overlays: copy a scene collection from your regular OBS (the IRL scenes are built from it):');
   CollectionCombo := TNewComboBox.Create(ObsPage);
   CollectionCombo.Parent := ObsPage.Surface;
@@ -434,7 +633,8 @@ begin
   DuckPanel.Height := RemoteDetailPage.SurfaceHeight;
   L := TNewStaticText.Create(DuckPanel);
   L.Parent := DuckPanel; L.AutoSize := False; L.WordWrap := True; L.Width := DuckPanel.Width;
-  L.Caption := 'On duckdns.org: sign in (GitHub, Google, Reddit or X), type a name under "sub domain" and press "add domain". Then copy the token shown at the top of the page.';
+  L.Caption := 'On duckdns.org: sign in (Google, GitHub, Reddit or X), type a name under "sub domain" and press "add domain". ' +
+    'Then click the token at the top of the page to copy it: Setup picks it up by itself.';
   L.AdjustHeight;
   B := NewButton(RemoteDetailPage, 0, L.Top + L.Height + ScaleY(6), ScaleX(140), 'Open duckdns.org', @OpenDuckDns);
   B.Parent := DuckPanel;
@@ -502,6 +702,24 @@ begin
   Result := (not IsUpdate) or UpdatePage.Values[0];
 end;
 
+function ChangingChannels: Boolean;
+begin
+  Result := (not IsUpdate) or UpdatePage.Values[1];
+end;
+
+// Checks a DuckDNS name and token with DuckDNS (without moving the name: it's re-pointed at the address it has now).
+function DuckDnsAccepts(Name, Token: String): Boolean;
+var
+  Code: Integer;
+  Cmd: String;
+begin
+  Cmd := '$n=''' + Name + '''; $t=''' + Token + '''; $ip=try{(Resolve-DnsName ($n+''.duckdns.org'') -Type A -DnsOnly -ErrorAction Stop | ? IPAddress | select -First 1).IPAddress}catch{''}; ' +
+    '$r=Invoke-RestMethod (''https://www.duckdns.org/update?domains=''+$n+''&token=''+$t+$(if($ip){''&ip=''+$ip})) -TimeoutSec 15; if($r -eq ''OK''){exit 0}else{exit 3}';
+  Result := Exec(PowerShellExe, '-NoProfile -Command "' + Cmd + '"', '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+  // No internet right now: don't block Setup, the installer checks again.
+  if not Result and (Code <> 3) then Result := True;
+end;
+
 function ShouldSkipPage(PageID: Integer): Boolean;
 var
   I: Integer;
@@ -510,7 +728,8 @@ begin
   Result := False;
   if PageID = wpWelcome then Result := IsUpdate   // the update page says it all
   else if PageID = UpdatePage.ID then Result := not IsUpdate
-  else if (PageID = wpSelectDir) or (PageID = ChannelsPage.ID) or (PageID = OptionsPage.ID) then Result := IsUpdate
+  else if (PageID = wpSelectDir) or (PageID = OptionsPage.ID) then Result := IsUpdate
+  else if (PageID = ChannelsPage.ID) or (PageID = CustomPage.ID) then Result := not ChangingChannels
   else if PageID = ObsPage.ID then Result := IsUpdate or ((CollectionCombo.Items.Count = 1) and (ProfileCombo.Items.Count = 1))
   else if PageID = OverlayPage.ID then
   begin
@@ -531,6 +750,7 @@ procedure CurPageChanged(CurPageID: Integer);
 var
   I: Integer;
 begin
+  if (CurPageID <> RemoteDetailPage.ID) and (DuckTimer <> 0) then begin KillTimer(0, DuckTimer); DuckTimer := 0; end;
   if CurPageID = OverlayPage.ID then
   begin
     if OverlayFor <> CollectionCombo.Text then
@@ -543,7 +763,8 @@ begin
   end
   else if CurPageID = LoginPage.ID then
   begin
-    if LoginUser.Text = '' then LoginUser.Text := Lowercase(Trim(ChannelsPage.Values[0]));
+    if LoginUser.Text = '' then LoginUser.Text := Lowercase(Trim(TwitchEdit.Text));
+    if LoginUser.Text = '' then LoginUser.Text := 'admin';
     LoginGenerateClick(nil);
   end
   else if CurPageID = RelayPage.ID then
@@ -557,6 +778,9 @@ begin
   begin
     DuckPanel.Visible := RemotePage.SelectedValueIndex = 0;
     DomainPanel.Visible := RemotePage.SelectedValueIndex = 1;
+    // A name suggestion from your Twitch name (DuckDNS names are first come, first served).
+    if (DuckNameEdit.Text = '') and (Trim(TwitchEdit.Text) <> '') then DuckNameEdit.Text := Lowercase(Trim(TwitchEdit.Text)) + '-irl';
+    if DuckPanel.Visible and (DuckTimer = 0) then DuckTimer := SetTimer(0, 0, 1000, CreateCallback(@DuckClipboardTick));
   end
   else if (CurPageID = wpFinished) and not InstallOk then
   begin
@@ -573,16 +797,37 @@ begin
   Result := True;
   if CurPageID = ChannelsPage.ID then
   begin
-    S := Trim(ChannelsPage.Values[0]);
-    if not OnlyChars(Lowercase(S), 'abcdefghijklmnopqrstuvwxyz0123456789_') then
+    // A pasted link works too: keep just the name.
+    S := Lowercase(Trim(TwitchEdit.Text));
+    StringChangeEx(S, 'https://', '', True); StringChangeEx(S, 'www.', '', True); StringChangeEx(S, 'twitch.tv/', '', True);
+    if Pos('/', S) > 0 then S := Copy(S, 1, Pos('/', S) - 1);
+    if (S <> '') and not OnlyChars(S, 'abcdefghijklmnopqrstuvwxyz0123456789_') then
     begin
-      MsgBox('Enter your Twitch channel name (letters, numbers and _ only, without twitch.tv/).', mbError, MB_OK); Result := False; Exit;
+      MsgBox('That doesn''t look like a Twitch name (letters, numbers and _ only). Or leave it empty to skip Twitch for now.', mbError, MB_OK); Result := False; Exit;
     end;
-    S := Trim(ChannelsPage.Values[2]);
-    if (S <> '') and ((Copy(S, 1, 2) <> 'UC') or (Length(S) <> 24)) then
+    TwitchEdit.Text := S;
+    S := Lowercase(Trim(KickEdit.Text));
+    StringChangeEx(S, 'https://', '', True); StringChangeEx(S, 'www.', '', True); StringChangeEx(S, 'kick.com/', '', True);
+    if Pos('/', S) > 0 then S := Copy(S, 1, Pos('/', S) - 1);
+    if (S <> '') and not OnlyChars(S, 'abcdefghijklmnopqrstuvwxyz0123456789_-') then
     begin
-      MsgBox('A YouTube channel ID starts with UC and is 24 characters long (YouTube Studio > Settings > Channel > Advanced settings). Or leave it empty.', mbError, MB_OK); Result := False; Exit;
+      MsgBox('That doesn''t look like a Kick name (letters, numbers, - and _ only). Or leave it empty to skip Kick for now.', mbError, MB_OK); Result := False; Exit;
     end;
+    KickEdit.Text := S;
+    YoutubeEdit.Text := Trim(YoutubeEdit.Text);   // a link, @handle or UC... ID: the installer finds the channel
+  end
+  else if CurPageID = CustomPage.ID then
+  begin
+    S := Trim(CustomServerEdit.Text);
+    if (S = '') and ((Trim(CustomNameEdit.Text) <> '') or (Trim(CustomKeyEdit.Text) <> '')) then
+    begin
+      MsgBox('Enter the server address too (it starts with rtmp://), or click "Skip for now".', mbError, MB_OK); Result := False; Exit;
+    end;
+    if (S <> '') and (Pos('rtmp://', Lowercase(S)) <> 1) and (Pos('rtmps://', Lowercase(S)) <> 1) then
+    begin
+      MsgBox('The server address starts with rtmp:// or rtmps:// (that service shows it next to your stream key).', mbError, MB_OK); Result := False; Exit;
+    end;
+    CustomServerEdit.Text := S;
   end
   else if CurPageID = LoginPage.ID then
   begin
@@ -613,9 +858,13 @@ begin
       DuckNameEdit.Text := S;
       S := Trim(DuckTokenEdit.Text);
       if (S = '') and (InfoValue('prev', 'hasDuckdnsToken') = '1') then Exit;
-      if (Length(S) <> 36) or not OnlyChars(Lowercase(S), '0123456789abcdef-') then
+      if not IsDuckToken(S) then
       begin
         MsgBox('That doesn''t look like a DuckDNS token (36 letters and numbers with dashes, shown at the top of duckdns.org once you''re signed in).', mbError, MB_OK); Result := False; Exit;
+      end;
+      if not DuckDnsAccepts(DuckNameEdit.Text, Lowercase(S)) then
+      begin
+        MsgBox('DuckDNS says "' + DuckNameEdit.Text + '.duckdns.org" isn''t yours with that token. Check you added that name on duckdns.org (press "add domain"), or copy the token again.', mbError, MB_OK); Result := False; Exit;
       end;
     end
     else
@@ -638,11 +887,19 @@ var
   S: String;
 begin
   if IsUpdate then S := 'Update IRL Homekit ' + InstalledVersion + ' to {#AppVersion}, keeping your settings.' + NewLine + NewLine
-  else
+  else S := MemoDirInfo + NewLine + NewLine;
+  if ChangingChannels then
   begin
-    S := MemoDirInfo + NewLine + NewLine + 'Twitch:' + NewLine + Space + Trim(ChannelsPage.Values[0]) + NewLine;
-    if Trim(ChannelsPage.Values[1]) <> '' then S := S + 'Kick:' + NewLine + Space + Trim(ChannelsPage.Values[1]) + NewLine;
-    if Trim(ChannelsPage.Values[2]) <> '' then S := S + 'YouTube:' + NewLine + Space + Trim(ChannelsPage.Values[2]) + NewLine;
+    S := S + 'Channels:' + NewLine;
+    if TwitchEdit.Text <> '' then S := S + Space + 'Twitch: ' + TwitchEdit.Text + NewLine;
+    if KickEdit.Text <> '' then S := S + Space + 'Kick: ' + KickEdit.Text + NewLine;
+    if YoutubeEdit.Text <> '' then S := S + Space + 'YouTube: ' + YoutubeEdit.Text + NewLine;
+    if CustomServerEdit.Text <> '' then S := S + Space + 'Custom destination: ' + CustomNameEdit.Text + ' (' + CustomServerEdit.Text + ')' + NewLine;
+    if (TwitchEdit.Text = '') and (KickEdit.Text = '') and (YoutubeEdit.Text = '') and (CustomServerEdit.Text = '') then
+      S := S + Space + 'none yet (add them later by running Setup again)' + NewLine;
+  end;
+  if not IsUpdate then
+  begin
     S := S + 'OBS:' + NewLine + Space + CollectionCombo.Text + NewLine + Space + ProfileCombo.Text + NewLine;
     if ImportObsCheck.Checked then S := S + Space + 'plus everything else from your regular OBS' + NewLine;
   end;
@@ -672,11 +929,17 @@ var
   S, Overlays: String;
 begin
   S := '{';
+  // Channels: empty = none (skipped), so an update can also remove one.
+  if ChangingChannels then
+  begin
+    if TwitchEdit.Text = '' then S := S + '"TwitchChannel":"none"' else S := S + '"TwitchChannel":' + JsonStr(TwitchEdit.Text);
+    if KickEdit.Text = '' then S := S + ',"KickChannel":"none"' else S := S + ',"KickChannel":' + JsonStr(KickEdit.Text);
+    if YoutubeEdit.Text = '' then S := S + ',"YoutubeChannelId":"none"' else S := S + ',"YoutubeChannelId":' + JsonStr(YoutubeEdit.Text);
+    if CustomServerEdit.Text <> '' then S := S + ',"CustomName":' + JsonStr(Trim(CustomNameEdit.Text)) + ',"CustomServer":' + JsonStr(CustomServerEdit.Text)
+    else if InfoValue('prev', 'customServer') <> '' then S := S + ',"CustomServer":"off"';
+  end;
   if not IsUpdate then
   begin
-    S := S + '"TwitchChannel":' + JsonStr(Trim(ChannelsPage.Values[0]));
-    if Trim(ChannelsPage.Values[1]) = '' then S := S + ',"KickChannel":"none"' else S := S + ',"KickChannel":' + JsonStr(Trim(ChannelsPage.Values[1]));
-    S := S + ',"YoutubeChannelId":' + JsonStr(Trim(ChannelsPage.Values[2]));
     if CollectionCombo.ItemIndex > 0 then S := S + ',"BaseCollection":' + JsonStr(CollectionCombo.Text);
     if ProfileCombo.ItemIndex > 0 then S := S + ',"BaseProfile":' + JsonStr(ProfileCombo.Text);
     if ImportObsCheck.Checked then S := S + ',"ImportObs":true' else S := S + ',"ImportObs":false';
@@ -744,6 +1007,7 @@ begin
   if (not ShouldSkipPage(LoginPage.ID)) and (not LoginGenerate.Checked) then SetEnvironmentVariable('IRLHK_DASHBOARD_PASSWORD', LoginPass.Text);
   if ChangingNetwork and (RemotePage.SelectedValueIndex = 0) and (Trim(DuckTokenEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_DUCKDNS_TOKEN', Trim(DuckTokenEdit.Text));
   SetEnvironmentVariable('IRLHK_RELAY_TOKEN', RelayToken);
+  if ChangingChannels and (Trim(CustomKeyEdit.Text) <> '') then SetEnvironmentVariable('IRLHK_CUSTOM_KEY', Trim(CustomKeyEdit.Text));
 
   WizardForm.ProgressGauge.Min := 0;
   WizardForm.ProgressGauge.Max := 100;
@@ -751,11 +1015,17 @@ begin
   WizardForm.StatusLabel.Caption := 'Installing IRL Homekit...';
   Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\src\install.ps1') + '" -NonInteractive' +
     ' -InstallDir "' + Dir + '" -AnswersFile "' + ExpandConstant('{tmp}\answers.json') + '" -ResultFile "' + ResultFile + '"';
+#ifdef TestInstallDir
+  // Test builds: no scheduled tasks, shortcuts, firewall rules, Apps entry or relay tunnel; keep the answers to check.
+  Params := Params + ' -SkipSystem';
+  FileCopy(ExpandConstant('{tmp}\answers.json'), Dir + '-answers.json', False);
+#endif
   InstallOk := ExecAndLogOutput(PowerShellExe, Params, ExpandConstant('{tmp}\src'), SW_HIDE, ewWaitUntilTerminated, Code, @OnInstallOutput) and (Code = 0);
 
   SetEnvironmentVariable('IRLHK_DASHBOARD_PASSWORD', '');
   SetEnvironmentVariable('IRLHK_DUCKDNS_TOKEN', '');
   SetEnvironmentVariable('IRLHK_RELAY_TOKEN', '');
+  SetEnvironmentVariable('IRLHK_CUSTOM_KEY', '');
   // Keep the full output with the app's other logs.
   ForceDirectories(Dir + '\logs');
   InstallLog.SaveToFile(Dir + '\logs\setup.log');

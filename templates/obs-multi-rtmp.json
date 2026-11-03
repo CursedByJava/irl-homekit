@@ -19,6 +19,16 @@
       "sync-start": false,
       "sync-stop": false,
       "enabled": true
+    },
+    {
+      "id": "1003",
+      "name": "Custom",
+      "protocol": "RTMP",
+      "service-param": { "server": "", "key": "", "use_auth": false },
+      "output-param": {},
+      "sync-start": false,
+      "sync-stop": false,
+      "enabled": true
     }
   ],
   "video_configs": [],

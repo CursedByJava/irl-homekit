@@ -6,7 +6,15 @@
 #    Or just open Start menu > "IRL Homekit - Twitch chat token" and paste when asked.
 param([string] $BotUsername, [string] $Token, [string] $RefreshToken)
 $ErrorActionPreference = 'Stop'
-$channel = (Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'settings.json') -Raw | ConvertFrom-Json).twitchChannel
+$settingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) 'settings.json'
+$channel = (Get-Content $settingsFile -Raw | ConvertFrom-Json).twitchChannel
+# Twitch was skipped in Setup: ask for the channel now and remember it.
+if (-not $channel) {
+    $channel = ((Read-Host 'Your Twitch channel name') -replace '^(https?://)?(www\.)?twitch\.tv/', '' -replace '[/?].*$', '').Trim().ToLower()
+    if (-not $channel) { throw 'A Twitch channel name is needed for chat commands.' }
+    $set = Get-Content $settingsFile -Raw | ConvertFrom-Json; $set | Add-Member -Force twitchChannel $channel
+    [IO.File]::WriteAllText($settingsFile, ($set | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding $false))
+}
 if (-not $BotUsername) { $BotUsername = Read-Host "Twitch login the bot posts as (press Enter for $channel)"; if (-not $BotUsername) { $BotUsername = $channel } }
 if (-not $Token) { $Token = (Read-Host 'Paste the ACCESS TOKEN from twitchtokengenerator.com').Trim() }
 if (-not $RefreshToken) { $RefreshToken = (Read-Host 'Paste the REFRESH TOKEN from twitchtokengenerator.com').Trim() }
@@ -25,7 +33,8 @@ $s | ConvertTo-Json | Set-Content -Encoding UTF8 "$root\secrets.json"
 
 $cfg = [IO.File]::ReadAllText("$dir\config.json")
 if ($cfg -match '"chat":\s*null') {
-    $chat = [IO.File]::ReadAllText("$dir\chat-block.json").Trim()
+    # Installed without Twitch: the chat block has no channel in it yet.
+    $chat = [IO.File]::ReadAllText("$dir\chat-block.json").Trim().Replace('"username": ""', "`"username`": `"$channel`"").Replace('"admins": [""]', "`"admins`": [`"$channel`"]")
     $cfg = $cfg -replace '"chat":\s*null', ('"chat": ' + $chat)
     $null = $cfg | ConvertFrom-Json
     [IO.File]::WriteAllText("$dir\config.json", $cfg, $utf8)

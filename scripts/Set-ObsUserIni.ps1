@@ -44,13 +44,18 @@ Set-Ini 'Basic' 'SceneCollection' $ObsName
 Set-Ini 'Basic' 'SceneCollectionFile' "$dir.json"
 
 $docks = @(); $raw = Get-Ini 'BasicWindow' 'ExtraBrowserDocks'
-if ($raw) { try { $docks = @($raw | ConvertFrom-Json | Where-Object { $_.url }) } catch { $docks = @() } }   # drop empty panels
+# Drop empty panels, and unwrap the {"value":[...],"Count":n} form earlier versions could write. (The parentheses
+# matter: Windows PowerShell passes a parsed JSON array down the pipeline as one object, not panel by panel.)
+if ($raw) { try { $docks = @(($raw | ConvertFrom-Json) | ForEach-Object { if ($_.PSObject.Properties['value'] -and -not $_.url) { $_.value } else { $_ } } | Where-Object { $_.url }) } catch { $docks = @() } }
 foreach ($d in @(@('IRL Homekit', 'http://localhost:8090/'), @('IRL Studio', 'http://localhost:8090/studio'))) {
     if (-not ($docks | Where-Object { $_.url -eq $d[1] })) {
         $docks += [pscustomobject][ordered]@{ title = $d[0]; url = $d[1]; uuid = [guid]::NewGuid().ToString() }
     }
 }
-Set-Ini 'BasicWindow' 'ExtraBrowserDocks' (ConvertTo-Json -Compress -InputObject @($docks))
+# One panel at a time: Windows PowerShell can write a whole array as {"value":[...],"Count":n}, and OBS crashes at
+# startup on that (YouTubeAppDock::CleanupYouTubeUrls).
+$json = @($docks | ForEach-Object { ConvertTo-Json -Compress -InputObject ([pscustomobject][ordered]@{ title = "$($_.title)"; url = "$($_.url)"; uuid = "$($_.uuid)" }) })
+Set-Ini 'BasicWindow' 'ExtraBrowserDocks' ('[' + ($json -join ',') + ']')
 
 New-Item -ItemType Directory -Force $ConfigDir | Out-Null
 [IO.File]::WriteAllLines($file, $lines, (New-Object Text.UTF8Encoding $true))
