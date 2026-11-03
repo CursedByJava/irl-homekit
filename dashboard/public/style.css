@@ -254,6 +254,10 @@ main { padding: 20px 16px 48px; display: grid; gap: 20px; max-width: 1120px; mar
 .platforms-head .desc { color: var(--label-2); font-size: 14px; margin-top: 2px; }
 .toggle:disabled { opacity: .4; cursor: not-allowed; }
 .desc .live-now { color: var(--red); font-weight: 600; }
+/* Phone settings: long addresses and passwords wrap anywhere and select in one tap */
+.item .desc.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; color: var(--label); overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; margin-top: 3px; }
+#phoneList:not([hidden]) { margin-top: 8px; }
+.offscreen { position: fixed; left: -9999px; top: 0; opacity: 0; }
 
 /* iOS switch (mute toggles: green = sound on) */
 .toggle {

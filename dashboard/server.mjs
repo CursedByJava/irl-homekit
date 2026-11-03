@@ -727,6 +727,27 @@ async function action(body) {
   }
 }
 
+// ---------------------------------------------------------------- phone settings (what to type into IRL Pro)
+// Same address the personal phone guide uses: the DuckDNS name if there is one (it follows the home IP), else the
+// home IP as it is right now. Read from disk on every request: the remote-dashboard setup can add DuckDNS later.
+// Only sent on request (never in the live /events stream), because it holds the stream passwords.
+async function phoneSettings() {
+  const sec = readJson(`${ROOT}/secrets.json`), set = readJson(`${ROOT}/settings.json`);
+  const duck = set.duckdnsName && sec.duckdnsToken ? `${set.duckdnsName}.duckdns.org` : '';
+  let ip = '';
+  if (!duck) { try { ip = (await (await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(5000) })).text()).trim(); } catch { } }
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) ip = '';
+  const host = duck || ip || sec.publicIp || '';
+  const user = sec.mediamtxUser || 'irl', pass = sec.mediamtxPass || '', phrase = sec.goirlPassphrase || '';
+  return {
+    host, duckdns: !!duck,
+    ipChanged: !duck && !!ip && !!sec.publicIp && ip !== sec.publicIp, installIp: sec.publicIp || '',
+    bonded: { server: `srtla://${host}:5000`, passphrase: phrase, combined: `srtla://${host}:5000?passphrase=${phrase}` },
+    srt: { server: `srt://${host}:8890`, streamId: `publish:live:${user}:${pass}` },
+    rtmp: { url: `rtmp://${host}:1935/live?user=${user}&pass=${pass}` },
+  };
+}
+
 // ---------------------------------------------------------------- http
 const clients = new Set();
 const STATIC = { '/app.js': 'application/javascript', '/studio.js': 'application/javascript', '/style.css': 'text/css', '/icon.svg': 'image/svg+xml', '/manifest.json': 'application/manifest+json',
@@ -863,6 +884,11 @@ const server = http.createServer(async (req, res) => {
       tick(); const iv = setInterval(tick, 1000); clients.add(res);
       req.on('close', () => { clearInterval(iv); clients.delete(res); });
       return;
+    }
+    if (url.pathname === '/api/phone' && req.method === 'GET') {
+      if (req.headers['x-irlhk'] !== '1') return send(res, 403, 'text/plain', 'bad request');
+      log('phone settings shown to', clientIp(req));
+      return send(res, 200, 'application/json', JSON.stringify(await phoneSettings()));
     }
     if (url.pathname === '/api/action' && req.method === 'POST') {
       if (req.headers['x-irlhk'] !== '1') return send(res, 403, 'text/plain', 'bad request');

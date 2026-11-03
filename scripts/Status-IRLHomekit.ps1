@@ -25,16 +25,21 @@ $goirl = Get-Content "$root\logs\go-irl.err.log" -Tail 3 -ErrorAction SilentlyCo
 if ($goirl) { Write-Host '  go-irl last log lines:'; $goirl | ForEach-Object { "    $_" } }
 
 Write-Host "`n== Public IP" -ForegroundColor Cyan
+# The phone connects to the DuckDNS name if there is one (it follows the home IP), else to the home IP as it is now.
+# Same rule as the installer's personal guide (PHONE-SETUP.md) and the dashboard's Phone settings card.
+$duck = if ($settings.duckdnsName -and $s.duckdnsToken) { "$($settings.duckdnsName).duckdns.org" }
+$ip = $null
 try {
     $ip = (Invoke-RestMethod 'https://api.ipify.org' -TimeoutSec 5).Trim()
-    $duck = if ($settings.duckdnsName -and $s.duckdnsToken) { "$($settings.duckdnsName).duckdns.org" }
     if ($ip -ne $s.publicIp -and $duck) { Write-Host "  $ip (changed since install; $duck follows it automatically)" -ForegroundColor Green }
-    elseif ($ip -ne $s.publicIp) { Write-Host "  CHANGED: now $ip (phone settings use $($s.publicIp)) - update IRL Pro and your DNS records, or use DuckDNS (docs\DOMAIN.md)" -ForegroundColor Yellow }
+    elseif ($ip -ne $s.publicIp) { Write-Host "  CHANGED: now $ip (was $($s.publicIp) at install) - put the new address below into IRL Pro and update your DNS records, or use DuckDNS (docs\DOMAIN.md)" -ForegroundColor Yellow }
     else { Write-Host "  $ip (unchanged)" -ForegroundColor Green }
 } catch { Write-Host '  could not check (no internet?)' -ForegroundColor Red }
+$phoneHost = if ($duck) { $duck } elseif ($ip) { $ip } else { $s.publicIp }
 
 Write-Host "`n== IRL Pro settings" -ForegroundColor Cyan
-Write-Host "  Bonded (main):  srtla://$($s.publicIp):5000   passphrase: $($s.goirlPassphrase)"
-Write-Host "  Backup SRT:     srt://$($s.publicIp):8890   stream id: publish:live:$($s.mediamtxUser):$($s.mediamtxPass)"
-Write-Host "  Backup RTMP:    rtmp://$($s.publicIp):1935/live?user=$($s.mediamtxUser)&pass=$($s.mediamtxPass)"
+if (-not $duck -and -not $ip) { Write-Host "  (could not check the current IP; showing the one from install: $($s.publicIp))" -ForegroundColor Yellow }
+Write-Host "  Bonded (main):  srtla://${phoneHost}:5000   passphrase: $($s.goirlPassphrase)"
+Write-Host "  Backup SRT:     srt://${phoneHost}:8890   stream id: publish:live:$($s.mediamtxUser):$($s.mediamtxPass)"
+Write-Host "  Backup RTMP:    rtmp://${phoneHost}:1935/live?user=$($s.mediamtxUser)&pass=$($s.mediamtxPass)"
 Write-Host "`nLogs: $root\logs"

@@ -350,6 +350,56 @@ function dashboard() {
     }
     act({ action: 'setAutoStart', on: !s.autoStart }, s.autoStart ? 'IRL Homekit no longer starts with Windows.' : 'IRL Homekit now starts with Windows.');
   };
+  // ---------- phone settings (ingest addresses + passwords): fetched only when asked, hidden again after 2 minutes
+  let phoneHide;
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { }
+    const t = el('textarea'); t.value = text; t.setAttribute('readonly', ''); t.className = 'offscreen'; document.body.append(t);
+    t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch { } t.remove(); return ok;
+  }
+  function hidePhone() {
+    clearTimeout(phoneHide); $('phoneList').hidden = true; $('phoneList').replaceChildren();
+    $('phoneBtn').textContent = 'Show'; $('phoneBtn').setAttribute('aria-expanded', 'false');
+  }
+  async function showPhone() {
+    const b = $('phoneBtn'); b.disabled = true; b.textContent = 'Loading…';
+    try {
+      const r = await fetch('/api/phone', { headers: { 'X-IRLHK': '1' }, credentials: 'same-origin' });
+      if (r.status === 401) { location.href = '/login'; return; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const p = await r.json();
+      const rows = [
+        ['Bonded (main) · Server', p.bonded.server, 'Protocol SRTLA, bonding on (mobile data + Wi-Fi).'],
+        ['Bonded · Passphrase', p.bonded.passphrase, 'Leave Stream ID empty.'],
+        ['Bonded · Server with passphrase', p.bonded.combined, 'Only if your app has no separate passphrase field.'],
+        ['Backup · SRT server', p.srt.server, 'Protocol SRT, no bonding.'],
+        ['Backup · SRT stream ID', p.srt.streamId, ''],
+        ['Backup · RTMP', p.rtmp.url, 'Last resort, if SRT won\'t connect.'],
+      ];
+      $('phoneList').replaceChildren(...rows.map(([title, value, hint]) => {
+        const it = el('div', 'item'), g = el('div', 'grow');
+        g.append(el('div', 'title', title), el('div', 'desc mono', value)); if (hint) g.append(el('div', 'desc', hint));
+        const c = el('button', 'btn small ghost', 'Copy'); c.setAttribute('aria-label', 'Copy ' + title);
+        c.onclick = async () => { if (await copyText(value)) toast('success', 'Copied.', title); else toast('error', 'Couldn\'t copy.', 'Press and hold the text to copy it instead.'); };
+        it.append(g, c); return it;
+      }));
+      if (p.ipChanged) {
+        const w = el('div', 'item'), g = el('div', 'grow');
+        g.append(el('div', 'title', 'Your home IP changed'), el('div', 'desc', 'It was ' + p.installIp + ' when IRL Homekit was installed and is ' + p.host
+          + ' now. Update the server in IRL Pro to the addresses above. To stop this happening, set up a free DuckDNS name: run "IRL Homekit - Set up remote dashboard" on the PC.'));
+        w.append(el('span', 'status-dot warn'), g); $('phoneList').prepend(w);
+      }
+      $('phoneList').hidden = false; b.textContent = 'Hide'; b.setAttribute('aria-expanded', 'true');
+      clearTimeout(phoneHide); phoneHide = setTimeout(hidePhone, 2 * 60e3);
+    } catch (e) {
+      toast('error', 'Couldn\'t load your phone settings.', /fetch|network/i.test(e.message) ? 'Couldn\'t reach your home PC. Check your signal and try again.'
+        : 'The PC answered "' + e.message + '". They are also in PHONE-SETUP.md in the IRL Homekit folder on the PC.');
+      b.textContent = 'Show';
+    }
+    finally { b.disabled = false; }
+  }
+  $('phoneBtn').onclick = () => ($('phoneList').hidden ? showPhone() : hidePhone());
+
   document.querySelectorAll('[data-action]').forEach((b) => {
     b.onclick = () => act({ action: b.dataset.action }, b.dataset.action === 'restartPhoneFeed' ? 'Phone feed reloaded.' : 'Overlays reloaded.');
   });

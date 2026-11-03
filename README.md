@@ -72,6 +72,8 @@ Nothing else to install: IRL Homekit brings its own copy of Node.js (for the das
    - When it's done, IRL Homekit opens.
 3. Open `C:\IRLHomekit\PHONE-SETUP.md`. It has **your** IRL Pro settings, passwords and the last manual steps:
    router port forwarding ([ROUTER.md](docs/ROUTER.md)), your Twitch stream key, and optional Kick/YouTube keys.
+   Need the IRL Pro settings again later? They're on the dashboard (**Phone settings** → Show, with copy buttons) and in
+   Start menu → *IRL Homekit - Status*.
 4. Go live from your phone with Wi-Fi off to prove it works from outside.
 
 **Updating:** IRL Homekit tells you when there's a new version (see [Updates](#updates)). You can also download the new

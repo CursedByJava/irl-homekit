@@ -11,6 +11,19 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.12] - 2026-11-02
+
+### Added
+- **Phone settings on the dashboard.** A new card shows everything to enter in IRL Pro (bonded SRTLA server and
+  passphrase, backup SRT server and stream ID, RTMP), each with a Copy button, so you can set up or fix the phone from
+  anywhere instead of only from `PHONE-SETUP.md` on the PC. It stays hidden until you tap Show (it holds your stream
+  passwords; keep it off camera) and hides itself again after 2 minutes. Only signed-in devices can load it.
+
+### Fixed
+- Status always showed the IP address from install in the IRL Pro settings, even with a DuckDNS name, and kept showing
+  the old IP after your home IP changed. It now shows the same address as your phone guide: the DuckDNS name if you
+  have one, otherwise your current home IP.
+
 ## [1.0.0-beta.11] - 2026-11-02
 
 ### Fixed
@@ -169,7 +182,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.11...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.12...HEAD
+[1.0.0-beta.12]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.11...v1.0.0-beta.12
 [1.0.0-beta.11]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.10...v1.0.0-beta.11
 [1.0.0-beta.10]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.9...v1.0.0-beta.10
 [1.0.0-beta.9]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.8...v1.0.0-beta.9
