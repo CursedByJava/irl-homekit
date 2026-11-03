@@ -43,6 +43,10 @@ Keep this file private: it contains your stream passwords (also stored in `{{INS
   can't use both). Enable Developer options by tapping *Build number* 7 times.
 - Samsung: *Connections → Wi-Fi → Intelligent Wi-Fi* → **Switch to mobile data = OFF**.
 
+**Quickest:** open the dashboard on your phone → **Phone settings** → Show → **Open in IRL Pro**, and accept the
+import. That adds both connections below with everything filled in. (Or copy the link there and paste it in IRL Pro:
+*Settings → Import/Export Settings → Import Settings*.) Then set bonding and video as below.
+
 ### Connection 1 — Bonded (main)
 | Field | Value |
 |---|---|

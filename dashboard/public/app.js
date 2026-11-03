@@ -423,6 +423,18 @@ function dashboard() {
         c.onclick = async () => { if (await copyText(value)) toast('success', 'Copied.', title); else toast('error', 'Couldn\'t copy.', 'Press and hold the text to copy it instead.'); };
         it.append(g, c); return it;
       }));
+      // One tap: IRL Pro opens and offers to import both connections (on the phone itself; or paste the link in
+      // IRL Pro > Settings > Import/Export Settings > Import Settings).
+      if (p.irlPro) {
+        const it = el('div', 'item'), g = el('div', 'grow');
+        g.append(el('div', 'title', 'Set up IRL Pro in one tap'),
+          el('div', 'desc', 'On your phone: tap Open in IRL Pro and accept the import. Adds the bonded connection and a backup one (switched off). Elsewhere: copy the link and paste it in IRL Pro under Settings > Import/Export Settings > Import Settings.'));
+        const open = el('a', 'btn small', 'Open in IRL Pro'); open.href = p.irlPro;
+        const c = el('button', 'btn small ghost', 'Copy link'); c.setAttribute('aria-label', 'Copy the IRL Pro import link');
+        c.onclick = async () => { if (await copyText(p.irlPro)) toast('success', 'Copied.', 'Paste it in IRL Pro: Settings > Import/Export Settings > Import Settings.'); else toast('error', 'Couldn\'t copy.', 'Use Open in IRL Pro on your phone instead.'); };
+        const btns = el('div', 'row'); btns.append(open, c);
+        it.append(g, btns); $('phoneList').prepend(it);
+      }
       if (p.ipChanged) {
         const w = el('div', 'item'), g = el('div', 'grow');
         g.append(el('div', 'title', 'Your home IP changed'), el('div', 'desc', 'It was ' + p.installIp + ' when IRL Homekit was installed and is ' + p.host

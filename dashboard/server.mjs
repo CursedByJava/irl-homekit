@@ -866,7 +866,15 @@ async function phoneSettings() {
   if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) ip = '';
   const host = duck || relay || ip || sec.publicIp || '';
   const user = sec.mediamtxUser || 'irl', pass = sec.mediamtxPass || '', phrase = sec.goirlPassphrase || '';
+  // IRL Pro (built on Larix Broadcaster) imports connections from a larix:// "Grove" link: the bonded one, and the
+  // backup SRT one switched off. https://softvelum.com/larix/grove/
+  const conn = (o) => Object.entries(o).map(([k, v]) => `conn[][${k}]=${encodeURIComponent(v)}`).join('&');
+  const irlPro = host ? 'larix://set/v1?' + [
+    conn({ url: `srtla://${host}:5000`, name: 'IRL Homekit (bonded)', srtpass: phrase, srtlatency: 2000, srtmode: 'c', mode: 'va', overwrite: 'on', active: 'on' }),
+    conn({ url: `srt://${host}:8890`, name: 'IRL Homekit (backup)', srtstreamid: `publish:live:${user}:${pass}`, srtlatency: 2000, srtmode: 'c', mode: 'va', overwrite: 'on', active: 'off' }),
+  ].join('&') : '';
   return {
+    irlPro,
     host, duckdns: !!duck, relay: !!relay,
     ipChanged: !duck && !relay && !!ip && !!sec.publicIp && ip !== sec.publicIp, installIp: sec.publicIp || '',
     bonded: { server: `srtla://${host}:5000`, passphrase: phrase, combined: `srtla://${host}:5000?passphrase=${phrase}` },

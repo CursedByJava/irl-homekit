@@ -18,6 +18,9 @@ is what the built-in update checker reads.
   official API: with the *channel:manage:clips* permission on your Twitch chat token the clips play as plain video,
   otherwise in Twitch's own player. When there's nothing to play, your usual BRB screen shows. Kick and YouTube
   have no clips API yet, so it's Twitch only for now.
+- **Set up IRL Pro in one tap.** Dashboard → *Phone settings* → Show → **Open in IRL Pro**: IRL Pro opens and
+  offers to import the bonded connection and a backup one, with the server, passphrase and stream ID filled in. No
+  typing addresses or passwords on the phone. (Or copy the link and paste it in IRL Pro's *Import Settings*.)
 
 ### Changed
 - **Download button at the top of the README**, and the newest version is now GitHub's "Latest" release, with
