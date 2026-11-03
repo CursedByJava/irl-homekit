@@ -11,6 +11,8 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.20] - 2026-11-03
+
 ### Added
 - **The dashboard on your phone with no account at all.** New first choice in Setup, the one-line install and
   *Set up remote dashboard*: "no account needed". Your dashboard gets your home's internet address, like
@@ -335,7 +337,8 @@ The first beta: IRL Homekit becomes an app you open and close, with its own OBS.
   (NOALBS), multistreaming to Twitch, Kick and YouTube (obs-multi-rtmp), remote dashboard and Studio with HTTPS
   (Caddy), watchdog, and installer.
 
-[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.19...HEAD
+[Unreleased]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.20...HEAD
+[1.0.0-beta.20]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.19...v1.0.0-beta.20
 [1.0.0-beta.19]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.18...v1.0.0-beta.19
 [1.0.0-beta.18]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.17...v1.0.0-beta.18
 [1.0.0-beta.17]: https://github.com/CursedByJava/irl-homekit/compare/v1.0.0-beta.16...v1.0.0-beta.17
