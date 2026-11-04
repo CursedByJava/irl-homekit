@@ -667,7 +667,13 @@ function authed(req, res) {
   }
   return t;
 }
-function clientIp(req) { return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress; }
+// The web server adds the caller's address to the end of any X-Forwarded-For the visitor sent, so the last entry is
+// the one it put there and the only one worth trusting. Reading the first instead would let a visitor name themselves
+// and get a fresh allowance every try, which is what keeps the sign-in limit below honest.
+function clientIp(req) {
+  const seen = (req.headers['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+  return seen.length ? seen[seen.length - 1] : req.socket.remoteAddress;
+}
 // "Connect my phone": a QR code with a one-time link that signs the phone in (works once, for 10 minutes). Made only
 // on this PC itself or by someone already signed in.
 const pairCodes = new Map();   // code -> expiry ms

@@ -108,18 +108,22 @@ function Invoke-Upnp($r, $action, $fields) {
 function Get-UpnpEntry($r, $p) {
     Invoke-Upnp $r 'GetSpecificPortMappingEntry' ([ordered]@{ NewRemoteHost = ''; NewExternalPort = $p.Ext; NewProtocol = $p.Proto })
 }
+# 'yes' the forward leads to this PC, 'no' it leads somewhere else (or there is no way to tell), 'notyet' nothing is
+# listening here on that port, so the test had nothing to come back to. The installer opens the ports before the web
+# server starts, so 'notyet' is the normal answer during setup and the app checks again once it is up.
 function Test-Forward($p) {
-    if ($p.Proto -ne 'TCP' -or -not $state.externalIp -or -not (Get-NetTCPConnection -LocalPort $p.Port -State Listen -ErrorAction SilentlyContinue)) { return $false }
+    if ($p.Proto -ne 'TCP' -or -not $state.externalIp) { return 'no' }
+    if (-not (Get-NetTCPConnection -LocalPort $p.Port -State Listen -ErrorAction SilentlyContinue)) { return 'notyet' }
     $c = New-Object Net.Sockets.TcpClient
     try {
-        if (-not ($c.ConnectAsync($state.externalIp, $p.Ext).Wait(2000) -and $c.Connected)) { return $false }
+        if (-not ($c.ConnectAsync($state.externalIp, $p.Ext).Wait(2000) -and $c.Connected)) { return 'no' }
         # Something answered, but another PC on this network may be the one the port leads to. Only a forward that
         # points here loops the connection back to our own listener, where it shows up with the port we dialled out
         # from (routers keep the source port when they send it back in). No match means we can't claim it is ours.
         $mine = ([Net.IPEndPoint] $c.Client.LocalEndPoint).Port
         Start-Sleep -Milliseconds 200
-        [bool](Get-NetTCPConnection -LocalPort $p.Port -State Established -RemotePort $mine -ErrorAction SilentlyContinue)
-    } catch { $false } finally { $c.Close() }
+        if (Get-NetTCPConnection -LocalPort $p.Port -State Established -RemotePort $mine -ErrorAction SilentlyContinue) { 'yes' } else { 'no' }
+    } catch { 'no' } finally { $c.Close() }
 }
 # Another device has the phone's port on the router: use the next free outside port, leading to the same port here.
 function Set-UpnpPortAuto($r, $p) {
@@ -147,8 +151,11 @@ function Set-UpnpPort($r, $p) {
     # Taken, but not by a UPnP entry: a forward made in the router's own settings (Verizon answers 729 for those).
     # A TCP port this PC already listens on is checked by connecting to the home's internet address.
     if ($a.Error -in '718', '729') {
-        if (Test-Forward $p) { return @{ Ok = $true; Manual = $true; Note = 'already forwarded to this PC in the router''s own settings' } }
-        return @{ Ok = $true; Manual = $true; Unchecked = $true; Note = 'already forwarded in the router''s own settings, but not to this PC as far as IRL Homekit can tell (another PC or device may have it)' }
+        switch (Test-Forward $p) {
+            'yes'    { return @{ Ok = $true; Manual = $true; Note = 'already forwarded to this PC in the router''s own settings' } }
+            'notyet' { return @{ Ok = $true; Manual = $true; Pending = $true; Note = 'already forwarded in the router''s own settings; checked once IRL Homekit is running' } }
+            default  { return @{ Ok = $true; Manual = $true; Unchecked = $true; Note = 'already forwarded in the router''s own settings, but not to this PC as far as IRL Homekit can tell (another PC or device may have it)' } }
+        }
     }
     $why = switch ($a.Error) { { $_ -in '606', '401', '501' } { 'the router refused (it may only allow this for some devices)' }
         '724' { 'the router needs the same inside and outside port' } default { "the router refused (error $($a.Error))" } }
@@ -234,7 +241,7 @@ if (-not $state.method) {
         $r = if ($state.method -eq 'UPnP') { Set-UpnpPortAuto $router $p } else { Set-NatPmpPort $p $LeaseSeconds }
         # A port moved earlier stays moved: say so on every renewal.
         if ($r.Ok -and $p.Ext -ne $p.Port -and -not $r.Moved) { $r.Note = "opened as $($p.Ext) (the phone uses $($p.Ext); $($p.Port) is taken by another device)" }
-        $state.ports += [ordered]@{ proto = $p.Proto; port = $p.Port; external = $p.Ext; what = $p.What; ok = $r.Ok; manual = [bool]$r.Manual; unchecked = [bool]$r.Unchecked; note = $r.Note }
+        $state.ports += [ordered]@{ proto = $p.Proto; port = $p.Port; external = $p.Ext; what = $p.What; ok = $r.Ok; manual = [bool]$r.Manual; unchecked = [bool]$r.Unchecked; pending = [bool]$r.Pending; note = $r.Note }
     }
     $failed = @($state.ports | Where-Object { -not $_.ok })
     $manual = @($state.ports | Where-Object { $_.manual })
@@ -257,11 +264,17 @@ if (-not $state.method) {
         $names = @($manual | ForEach-Object { "$($_.proto) $($_.port)" })
         $list = if ($names.Count -gt 1) { ($names[0..($names.Count - 2)] -join ', ') + " and $($names[-1])" } else { $names[0] }
         $unchecked = @($manual | Where-Object { $_.unchecked })
-        # The router says those ports are taken but won't say by whom, and the connection test didn't come back to
-        # this PC. Only one PC on a network can have 80 and 443, so say so instead of calling it ready.
-        if ($unchecked) { $state.problem = 'unverified' }
+        $pending = @($manual | Where-Object { $_.pending })
+        # The router says those ports are taken but won't say by whom. Unchecked means the test ran and did not come
+        # back to this PC, and only one PC on a network can have 80 and 443, so say so instead of calling it ready.
+        # Pending means the test had nothing to come back to yet, which is what setup sees: don't raise it as a problem.
+        if ($unchecked) { $state.problem = 'unverified' } elseif ($pending) { $state.problem = 'pending' }
+        $are = if ($names.Count -gt 1) { 'are' } else { 'is' }
+        $lead = if ($names.Count -gt 1) { 'they lead' } else { 'it leads' }
+        $yours = "$are already forwarded on your router, which is usually your own forward and nothing to do."
         $state.message = "Router ports ($($state.method)$(if ($state.router) { ", $($state.router)" })): $($state.ports.Count - $manual.Count) opened automatically; $list " +
-            $(if ($unchecked) { "$(if ($names.Count -gt 1) { 'are' } else { 'is' }) already forwarded on your router, which is usually your own forward and nothing to do. IRL Homekit just can't confirm from here that $(if ($names.Count -gt 1) { 'they lead' } else { 'it leads' }) to this PC ($lan): if the HTTPS certificate arrives in the next couple of minutes, everything is fine, and Status says so. If it never arrives, another PC on your network probably has $(if ($names.Count -gt 1) { 'those ports' } else { 'that port' }): only one PC can." }
+            $(if ($unchecked) { "$yours IRL Homekit just can't confirm from here that $lead to this PC ($lan): if the HTTPS certificate arrives in the next couple of minutes, everything is fine, and Status says so. If it never arrives, another PC on your network probably has $(if ($names.Count -gt 1) { 'those ports' } else { 'that port' }): only one PC can." }
+              elseif ($pending) { "$yours IRL Homekit checks that $lead to this PC ($lan) once it's running, and Status says so." }
               else { "already forwarded to this PC in the router's own settings." }) + $movedNote
     } else {
         $state.ok = $true

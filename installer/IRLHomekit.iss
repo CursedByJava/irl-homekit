@@ -1275,6 +1275,11 @@ begin
       '  to do. Setup just can''t confirm from here that they lead to THIS PC: if your phone opens the' + NL +
       '  dashboard, everything is fine. If it never does, another PC on your network probably has those' + NL +
       '  ports (only one PC can) - Start menu > IRL Homekit - Set up remote dashboard says which.' + NL
+  else if (ResultValue('portMapOk') = 'True') and (ResultValue('portMapProblem') = 'pending') then
+    S := S + NL + 'ROUTER' + NL +
+      '  Ports 80 and 443 are already forwarded on your router, which is usually your own forward and nothing' + NL +
+      '  to do. IRL Homekit checks that they lead to THIS PC the first time it runs, and tells you on the' + NL +
+      '  dashboard: Status.' + NL
   else if ResultValue('portMapOk') = 'True' then
     S := S + NL + 'ROUTER' + NL + '  Ports opened automatically: no port forwarding needed.' + NL
   else

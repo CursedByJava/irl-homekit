@@ -11,16 +11,11 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
-### Fixed
-- **OBS didn't start on a fresh Windows** ("MSVCP140.dll was not found"). OBS needs Microsoft's Visual C++ runtime,
-  which most PCs get from other programs but a new or freshly reset one doesn't have. The installer now installs it
-  (Microsoft's own installer, checked to be signed by Microsoft) when it's missing or too old.
-- **The one-line install now ends with your phone's QR code** when you set up the dashboard on your phone during the
-  install. Before, its summary still showed `http://localhost:8090` and no QR code opened.
-- **No more Windows Firewall question about OBS** the first time IRL Homekit opens. The installer adds a rule that
-  keeps the IRL Homekit OBS to this PC only (nothing on the network needs it; the dashboard talks to it locally).
-- An address chosen in *Set up remote dashboard* while IRL Homekit is open is picked up right away (following your
-  internet address when it changes, for the no-account dashboard), not only after IRL Homekit restarts.
+### Security
+- **Failed dashboard sign-ins are counted per visitor again.** The limit (five wrong tries, then a fifteen-minute
+  wait) went by the first address in the `X-Forwarded-For` header, which a visitor sets themselves, so a different
+  one on every try gave an endless supply of fresh guesses at your password. The web server now replaces that header
+  with the address the request really came from, and the dashboard reads the last entry instead of the first.
 
 ### Changed
 - **Clear answers when your phone can't open the dashboard.** If your router sends ports 443 and 80 to another device
@@ -29,6 +24,21 @@ is what the built-in update checker reads.
   phone" page keeps checking by itself and shows the code as soon as the certificate arrives.
 - If Windows **Smart App Control** blocks IRL Homekit's web server, the "Connect your phone" page and *Set up remote
   dashboard* say that, with how to allow it, instead of blaming the router.
+
+### Fixed
+- **OBS didn't start on a fresh Windows** ("MSVCP140.dll was not found"). OBS needs Microsoft's Visual C++ runtime,
+  which most PCs get from other programs but a new or freshly reset one doesn't have. The installer now installs it
+  (Microsoft's own installer, checked to be signed by Microsoft) when it's missing or too old.
+- **The one-line install now ends with your phone's QR code** when you set up the dashboard on your phone during the
+  install. Before, its summary still showed `http://localhost:8090` and no QR code opened.
+- **No more Windows Firewall question about OBS** the first time IRL Homekit opens. The installer adds a rule that
+  keeps the IRL Homekit OBS to this PC only (nothing on the network needs it; the dashboard talks to it locally).
+- **Setup no longer hints that another PC might have ports 80 and 443 when it simply hasn't looked yet.** The check
+  needs something listening here to catch its own connection coming back, and the web server isn't running during
+  setup, so every fresh install saw that wording. It now says the check happens once IRL Homekit is running, and
+  keeps the warning about another PC for when the check really ran and the connection led somewhere else.
+- An address chosen in *Set up remote dashboard* while IRL Homekit is open is picked up right away (following your
+  internet address when it changes, for the no-account dashboard), not only after IRL Homekit restarts.
 
 ## [1.0.0-beta.21] - 2026-11-03
 

@@ -23,5 +23,8 @@
 	reverse_proxy 127.0.0.1:8090 {
 		# Live stats use Server-Sent Events, which must not be buffered.
 		flush_interval -1
+		# Say who is calling, replacing anything the visitor claimed: the dashboard counts failed sign-ins per
+		# address, and a visitor who could name themselves would get a fresh allowance on every try.
+		header_up X-Forwarded-For {remote_host}
 	}
 }
