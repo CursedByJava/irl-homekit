@@ -11,6 +11,13 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+## [1.0.0-beta.21] - 2026-11-03
+
+### Added
+- **Web server settings of your own survive updates.** Anything you put in `caddy\extra.caddy` is added to the web
+  server's settings every time IRL Homekit writes them, so an extra site of your own stays. Handy when a second PC
+  on your network can't have ports 80 and 443: the PC that has them can pass a name of your own through to it.
+
 ### Changed
 - **Setup opens the QR code in your browser at the end of every install**, not only when it couldn't draw the code on
   the last page. The browser page makes a fresh code whenever the old one runs out, so there's always a working one

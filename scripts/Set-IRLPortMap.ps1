@@ -261,7 +261,7 @@ if (-not $state.method) {
         # this PC. Only one PC on a network can have 80 and 443, so say so instead of calling it ready.
         if ($unchecked) { $state.problem = 'unverified' }
         $state.message = "Router ports ($($state.method)$(if ($state.router) { ", $($state.router)" })): $($state.ports.Count - $manual.Count) opened automatically; $list " +
-            $(if ($unchecked) { "$(if ($names.Count -gt 1) { 'are' } else { 'is' }) already forwarded on your router, but IRL Homekit can't tell whether $(if ($names.Count -gt 1) { 'they lead' } else { 'it leads' }) to this PC ($lan). If another PC or device on your network has $(if ($names.Count -gt 1) { 'them' } else { 'it' }), remote access won't work here: only one PC can have ports 80 and 443. You'll know within a couple of minutes, when the HTTPS certificate either arrives or doesn't (Status says which)." }
+            $(if ($unchecked) { "$(if ($names.Count -gt 1) { 'are' } else { 'is' }) already forwarded on your router, which is usually your own forward and nothing to do. IRL Homekit just can't confirm from here that $(if ($names.Count -gt 1) { 'they lead' } else { 'it leads' }) to this PC ($lan): if the HTTPS certificate arrives in the next couple of minutes, everything is fine, and Status says so. If it never arrives, another PC on your network probably has $(if ($names.Count -gt 1) { 'those ports' } else { 'that port' }): only one PC can." }
               else { "already forwarded to this PC in the router's own settings." }) + $movedNote
     } else {
         $state.ok = $true

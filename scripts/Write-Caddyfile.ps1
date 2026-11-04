@@ -22,6 +22,10 @@ $global = if ($ip) { "default_sni $domain" } else { '' }
 $tls = if ($ip) { "tls {`n`t`tissuer acme {`n`t`t`tprofile shortlived`n`t`t}`n`t}" } else { '' }
 $text = $tpl.Replace('{{INSTALL_DIR}}', ($InstallDir -replace '\\', '/')).Replace('{{DOMAIN}}', $names).Replace('{{SERVERS}}', $servers).Replace('{{GLOBAL}}', $global).Replace('{{TLS}}', $tls)
 New-Item -ItemType Directory -Force (Split-Path $file) | Out-Null
+# Sites of your own (a second PC's dashboard, anything else) go in caddy\extra.caddy: this file is written again
+# whenever your settings change, so anything added to it directly would be lost. That one is added as it is.
+$extra = "$InstallDir\caddy\extra.caddy"
+if (Test-Path $extra) { $text = $text + "`n" + [IO.File]::ReadAllText($extra).TrimEnd() + "`n" }
 [IO.File]::WriteAllText($file, $text, (New-Object Text.UTF8Encoding $false))
 
 if ($Reload -and (Get-NetTCPConnection -LocalPort 2019 -State Listen -ErrorAction SilentlyContinue)) {
