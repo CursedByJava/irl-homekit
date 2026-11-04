@@ -16,6 +16,16 @@
         $('pairFoot').hidden = true;
         return;
       }
+      if (j.error === 'NO_CERT') {
+        $('qr').innerHTML = '';
+        $('pairSub').textContent = 'Your dashboard has no HTTPS certificate yet, so a phone would open a dead link.';
+        $('pairSteps').innerHTML = '<li>The internet can\'t reach this PC yet. Usually the router isn\'t letting ports 80 and 443 through &mdash; '
+          + 'or another PC on the same network already has them, and only one can.</li>'
+          + '<li><b>Status</b> on the dashboard says what is wrong; Start menu &gt; <b>IRL Homekit - Set up remote dashboard</b> sets it up again.</li>'
+          + '<li>The certificate arrives within a minute of the ports opening. Then press <b>New code</b>.</li>';
+        $('pairFoot').hidden = true;
+        return;
+      }
       $('qr').innerHTML = window.irlQr(j.url);
       $('qr').title = j.url;
       timer = setTimeout(show, (j.expiresIn - 30) * 1000);   // a fresh one before this one runs out

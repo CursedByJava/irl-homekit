@@ -16,6 +16,10 @@ let cfg = readJson(CONFIG_FILE);
 const secrets = readJson(`${ROOT}/secrets.json`);
 const settings = readJson(`${ROOT}/settings.json`);
 const PORT = cfg.port || 8090;
+// The web server keeps each certificate under its own name. No certificate means the internet can't reach this PC
+// yet, so nothing answers on https://<name> and any link we hand out would be a dead one.
+const CERT_DIR = path.join(ROOT, 'caddy', 'data', 'certificates', 'acme-v02.api.letsencrypt.org-directory');
+const hasCert = (name) => !!name && fs.existsSync(path.join(CERT_DIR, name, `${name}.crt`));
 // Windows task that opens IRL Homekit at sign-in (scripts/Install-Shortcuts.ps1 -AutoStart On|Off).
 const SIGNIN_TASK = 'IRL Homekit (sign-in)';
 function readAutoStart() {
@@ -360,8 +364,7 @@ async function checkRemote() {
       const got = await resolver.resolve4(n).catch(() => []);
       if (!got.includes(ip)) { r.ok = false; r.problem = got.length ? `${n} points to ${got[0]}, but ${where} is ${ip}. Update its DNS record.` : `${n} has no DNS record.`; break; }
     }
-    const certDir = path.join(ROOT, 'caddy', 'data', 'certificates', 'acme-v02.api.letsencrypt.org-directory');
-    if (r.ok) for (const n of names) if (!fs.existsSync(path.join(certDir, n, `${n}.crt`))) {
+    if (r.ok) for (const n of names) if (!hasCert(n)) {
       r.ok = false; r.problem = `No HTTPS certificate for ${n} yet: usually ${settings.relayHost ? "the relay VM doesn't let ports 80 and 443 in" : "the router isn't forwarding ports 80 and 443"}.`; break;
     }
   } catch (e) { r.ok = null; r.problem = 'Could not check (no internet?)'; }
@@ -671,6 +674,8 @@ const pairCodes = new Map();   // code -> expiry ms
 const PAIR_MS = 10 * 60e3;
 function newPairLink() {
   if (!settings.domain) return { url: '', error: 'NO_DOMAIN' };
+  // Never hand out a link the phone can't open: without a certificate https://<domain> answers nothing.
+  if (!hasCert(settings.domain)) return { url: '', error: 'NO_CERT', domain: settings.domain };
   for (const [c, exp] of pairCodes) if (exp < Date.now()) pairCodes.delete(c);
   if (pairCodes.size > 20) pairCodes.delete(pairCodes.keys().next().value);
   const code = crypto.randomBytes(18).toString('base64url');

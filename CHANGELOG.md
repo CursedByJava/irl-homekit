@@ -11,6 +11,18 @@ is what the built-in update checker reads.
 
 ## [Unreleased]
 
+### Changed
+- **Setup opens the QR code in your browser at the end of every install**, not only when it couldn't draw the code on
+  the last page. The browser page makes a fresh code whenever the old one runs out, so there's always a working one
+  to scan.
+
+### Fixed
+- **"Connect my phone" could hand out a QR code for a dead link.** On a PC the internet can't reach yet (the router
+  hasn't let ports 80 and 443 through, your provider uses carrier-grade NAT, or another PC on the same network
+  already has those ports), the page made a link to an address nothing answers on, and the phone simply failed to
+  open it with no explanation. It now checks for the HTTPS certificate first and says what's in the way instead,
+  the same as Setup's last page already did.
+
 ## [1.0.0-beta.20] - 2026-11-03
 
 ### Added
