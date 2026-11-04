@@ -359,6 +359,27 @@ foreach ($d in $Downloads) {
     Write-Utf8 $marker $d.Sha
     Info "$($d.Name): ok"
 }
+# OBS (and NOALBS) need Microsoft's Visual C++ runtime. Most PCs have it from other programs, a fresh Windows doesn't:
+# OBS then won't start ("MSVCP140.dll was not found"). Microsoft's own installer (signed by Microsoft, so Smart App
+# Control lets it run); OBS 33 needs 14.40 or newer.
+$vcDll = "$env:SystemRoot\System32\msvcp140.dll"
+$vcOk = (Test-Path $vcDll) -and (Test-Path "$env:SystemRoot\System32\vcruntime140_1.dll") -and
+    ([version](Get-Item $vcDll).VersionInfo.FileVersionRaw -ge [version]'14.40.0.0')
+if (-not $vcOk -and -not $SkipSystem) {
+    Info 'Microsoft Visual C++ runtime (OBS needs it): installing...'
+    $vcExe = "$InstallDir\_downloads\vc_redist.x64.exe"
+    try {
+        Invoke-WebRequest 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vcExe -UseBasicParsing
+        $sig = Get-AuthenticodeSignature $vcExe
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw 'the download is not signed by Microsoft, refused' }
+        $p = Start-Process $vcExe -ArgumentList '/install', '/quiet', '/norestart' -Wait -PassThru
+        if ($p.ExitCode -notin 0, 1638, 3010) { throw "its installer stopped with code $($p.ExitCode)" }
+        Info 'Microsoft Visual C++ runtime: ok'
+    } catch {
+        $m = "Couldn't install the Microsoft Visual C++ runtime ($($_.Exception.Message)), so OBS may not start. Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe and run the installer again."
+        $result.warnings += $m; Write-Warning $m
+    }
+}
 # Windows Smart App Control can block programs that don't carry a paid publisher signature, like these open-source
 # tools. Run each one once so a block is explained now, not discovered later as "not running".
 $blocked = @()
@@ -669,6 +690,12 @@ if ($SkipSystem) {
         Get-NetFirewallRule -DisplayName $r.Name -ErrorAction SilentlyContinue | Remove-NetFirewallRule
         New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -Action Allow -Program $r.Program -Protocol $r.Protocol -LocalPort $r.Port -Profile Any | Out-Null
     }
+    # The IRL Homekit OBS only needs this PC (the dashboard reaches its WebSocket on localhost, which the firewall
+    # doesn't filter). A rule for it keeps OBS's remote control off the network, and Windows from asking "allow
+    # public and private networks to access OBS Studio?" the first time it opens.
+    $obsRule = 'IRL Homekit - OBS (this PC only)'
+    Get-NetFirewallRule -DisplayName $obsRule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    New-NetFirewallRule -DisplayName $obsRule -Direction Inbound -Action Block -Program "$ObsDir\obs64.exe" -Profile Any | Out-Null
     Info 'firewall rules added'
     # Router ports: opened automatically unless there's a relay (nothing comes in through the router then, so
     # anything opened before is closed again) or it's switched off.
@@ -738,7 +765,15 @@ if (-not $SkipSystem) {
         $result.warnings += $msg; Write-Warning $msg
     }
     Start-ScheduledTask -TaskName 'IRL Homekit'
-    if ($setupRemote) { Step 9 'Remote dashboard'; & "$InstallDir\scripts\Setup-RemoteDashboard.ps1" -InstallDir $InstallDir }
+    if ($setupRemote) {
+        Step 9 'Remote dashboard'; & "$InstallDir\scripts\Setup-RemoteDashboard.ps1" -InstallDir $InstallDir
+        # The guided setup chose the address: show it below (and open the QR code for it), not this PC's.
+        $set = try { Get-Content "$InstallDir\settings.json" -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
+        if ($set.domain) {
+            $Domain = "$($set.domain)"; $dash = "https://$Domain"
+            $studioUrl = if ($set.studioDomain) { "https://$($set.studioDomain)" } else { "https://$Domain/studio" }
+        }
+    }
 }
 
 Write-Host "`nDone.$(if (-not $SkipSystem) { ' IRL Homekit is opening.' })" -ForegroundColor Green

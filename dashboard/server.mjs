@@ -677,6 +677,8 @@ const PAIR_MS = 10 * 60e3;
 function certState() {
   const d = settings.domain;
   if (hasCert(d)) return { ready: true };
+  // Windows Smart App Control blocks the web server itself (Start-IRLHomekit.ps1 writes logs\blocked.json).
+  try { if (JSON.parse(fs.readFileSync(path.join(ROOT, 'logs', 'blocked.json'), 'utf8')).includes('caddy')) return { ready: false, problem: 'BLOCKED' }; } catch { }
   let err = '';
   try {
     const f = path.join(ROOT, 'logs', 'caddy.log'), size = fs.statSync(f).size, len = Math.min(size, 256 * 1024), buf = Buffer.alloc(len);

@@ -20,13 +20,16 @@
       // from the web server's log), and keep checking until the certificate is there.
       if (j.error === 'NO_CERT') {
         $('qr').innerHTML = '';
+        const c = j.cert || {};
         const why = {
+          BLOCKED: 'Windows <b>Smart App Control</b> is blocking IRL Homekit\'s web server, so nothing answers your phone. On this PC: Windows Security &gt; App &amp; browser control &gt;'
+            + ' Smart App Control settings &gt; <b>Off</b> (Windows can\'t turn it back on without a reset), then close and reopen IRL Homekit.',
           OTHER_DEVICE: 'Your router sends ports 443 and 80 to <b>another device</b> on your network (maybe another PC with IRL Homekit), not this PC ('
-            + j.cert.lan + '). In your router\'s port forwarding, point TCP 443 and TCP 80 at ' + j.cert.lan + ', or delete those two rules (IRL Homekit then opens them by itself).',
+            + c.lan + '). In your router\'s port forwarding, point TCP 443 and TCP 80 at ' + c.lan + ', or delete those two rules (IRL Homekit then opens them by itself).',
           UNREACHABLE: 'The internet can\'t reach this PC on ports 443 and 80 yet (the router, or an internet connection that doesn\'t take incoming connections).'
             + ' On this PC: Start menu &gt; <b>IRL Homekit - Set up remote dashboard</b> checks it and says what to do.',
           NO_CERT: 'Your dashboard\'s free HTTPS certificate isn\'t there yet. If IRL Homekit just started, give it a minute. Otherwise, on this PC: Start menu &gt; <b>IRL Homekit - Set up remote dashboard</b> checks why.',
-        }[(j.cert || {}).problem] || ('The internet can\'t reach this PC yet. Usually the router isn\'t letting ports 80 and 443 through &mdash; '
+        }[c.problem] || ('The internet can\'t reach this PC yet. Usually the router isn\'t letting ports 80 and 443 through &mdash; '
           + 'or another PC on the same network already has them, and only one can. Start menu &gt; <b>IRL Homekit - Set up remote dashboard</b> checks it.');
         $('pairSub').textContent = 'Almost there: your phone can\'t open the dashboard yet.';
         $('pairSteps').innerHTML = '<li>' + why + '</li><li>Then come back here: <a href="#" id="pairAgain">check again</a>.</li>';

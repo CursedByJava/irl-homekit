@@ -200,9 +200,18 @@ if ($dnsOk) {
     $deadline = (Get-Date).AddMinutes(2)
     while ((Get-Date) -lt $deadline -and @($names | Where-Object { -not (Test-Path "$certDir\$_\$_.crt") }).Count) { Start-Sleep 5 }
 }
+# Windows Smart App Control blocking the web server (Start-IRLHomekit.ps1 notes it in logs\blocked.json): nothing
+# answers on 80/443, which looks like a router problem but isn't one.
+$caddyBlocked = try { (Get-Content "$InstallDir\logs\blocked.json" -Raw | ConvertFrom-Json) -contains 'caddy' } catch { $false }   # no @(): Windows PowerShell would nest the array
 foreach ($name in $names) {
     if (Test-Path "$certDir\$name\$name.crt") { Ok "HTTPS certificate for $name" ; continue }
     $certOk = $false
+    if ($caddyBlocked) {
+        Bad "Windows Smart App Control is blocking IRL Homekit's web server (Caddy), so nothing can answer your phone."
+        Say 'To allow it: Windows Security > App & browser control > Smart App Control settings > Off (Windows can''t turn it'
+        Say 'back on without a reset). Then close and reopen IRL Homekit, and run this again. More: docs\TROUBLESHOOTING.md'
+        break
+    }
     $err = Get-Content "$InstallDir\logs\caddy.log" -Tail 200 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"level":"error"' -and $_ -match [regex]::Escape($name) } | Select-Object -Last 1
     if (-not $dnsOk) { Bad "No certificate for $name yet: fix DNS first, then run this again." }
     elseif ($err -match 'Incorrect validation certificate|Cannot negotiate ALPN|tls: internal error|Error getting validation data|Invalid response from') {
@@ -213,11 +222,11 @@ foreach ($name in $names) {
         Bad "Let's Encrypt couldn't reach this PC for $name. $(if ($relayHost) { 'The relay isn''t passing ports 80 and 443 through yet.' } else { 'Your router isn''t forwarding ports 80 and 443 yet.' })"
     } else { Bad "No certificate for $name yet. $(if ($relayHost) { 'Usually the relay VM doesn''t let ports 80 and 443 in yet.' } else { 'Usually the router isn''t forwarding ports 80 and 443.' })" }
 }
-if (-not $certOk -and $dnsOk -and $relayHost) {
+if (-not $certOk -and $dnsOk -and $relayHost -and -not $caddyBlocked) {
     Say 'On Oracle Cloud: your VM > Subnet > Security list > Add ingress rules for TCP 80 and TCP 443 (source 0.0.0.0/0).'
     Say 'Also check Status (Start menu) shows the relay as connected. Step by step: docs\RELAY.md'
-} elseif (-not $certOk -and $dnsOk) {
-    $pm = try { Get-Content "$InstallDir\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
+} elseif (-not $certOk -and $dnsOk -and -not $caddyBlocked) {
+    $pm =try { Get-Content "$InstallDir\logs\portmap.json" -Raw | ConvertFrom-Json } catch { $null }
     if ($pm -and -not $pm.ok -and $pm.problem -ne 'unsupported') { Say $pm.message }
     Say "On your router, forward TCP 80 and TCP 443 to this PC ($lan). Router steps: docs\ROUTER.md"
     if ($interactive -and $gateway -and (Read-Host "Open your router's page ($gateway) now? (Y/n)") -notmatch '^n') { Start-Process "http://$gateway" }

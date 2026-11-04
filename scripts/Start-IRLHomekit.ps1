@@ -239,8 +239,14 @@ $nextIpCheck = Get-Date
 $nextPortMap = Get-Date
 $wsPort = if ($settings.obsWebsocketPort) { $settings.obsWebsocketPort } else { 4455 }
 $noWsSince = $null
+$settingsTime = (Get-Item "$root\settings.json").LastWriteTime
 while ($true) {
   try {
+    # Settings changed while open (Set up remote dashboard, the dashboard's own settings): use the new ones.
+    $t = (Get-Item "$root\settings.json" -ErrorAction SilentlyContinue).LastWriteTime
+    if ($t -and $t -ne $settingsTime) {
+        try { $script:settings = Get-Content "$root\settings.json" -Raw | ConvertFrom-Json; $settingsTime = $t } catch { }   # half-written: next time
+    }
     $irlObs = Get-IrlObs | Select-Object -First 1
     if (-not $irlObs) {
         if (Test-ObsCrashed) { Log 'IRL Homekit OBS crashed; restarting it'; Start-IrlObs -Minimized:$Background }
