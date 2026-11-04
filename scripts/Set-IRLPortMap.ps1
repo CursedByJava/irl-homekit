@@ -111,7 +111,15 @@ function Get-UpnpEntry($r, $p) {
 function Test-Forward($p) {
     if ($p.Proto -ne 'TCP' -or -not $state.externalIp -or -not (Get-NetTCPConnection -LocalPort $p.Port -State Listen -ErrorAction SilentlyContinue)) { return $false }
     $c = New-Object Net.Sockets.TcpClient
-    try { $c.ConnectAsync($state.externalIp, $p.Ext).Wait(2000) -and $c.Connected } catch { $false } finally { $c.Close() }
+    try {
+        if (-not ($c.ConnectAsync($state.externalIp, $p.Ext).Wait(2000) -and $c.Connected)) { return $false }
+        # Something answered, but another PC on this network may be the one the port leads to. Only a forward that
+        # points here loops the connection back to our own listener, where it shows up with the port we dialled out
+        # from (routers keep the source port when they send it back in). No match means we can't claim it is ours.
+        $mine = ([Net.IPEndPoint] $c.Client.LocalEndPoint).Port
+        Start-Sleep -Milliseconds 200
+        [bool](Get-NetTCPConnection -LocalPort $p.Port -State Established -RemotePort $mine -ErrorAction SilentlyContinue)
+    } catch { $false } finally { $c.Close() }
 }
 # Another device has the phone's port on the router: use the next free outside port, leading to the same port here.
 function Set-UpnpPortAuto($r, $p) {
@@ -140,7 +148,7 @@ function Set-UpnpPort($r, $p) {
     # A TCP port this PC already listens on is checked by connecting to the home's internet address.
     if ($a.Error -in '718', '729') {
         if (Test-Forward $p) { return @{ Ok = $true; Manual = $true; Note = 'already forwarded to this PC in the router''s own settings' } }
-        return @{ Ok = $true; Manual = $true; Unchecked = $true; Note = 'already forwarded in the router''s own settings (make sure it points at this PC)' }
+        return @{ Ok = $true; Manual = $true; Unchecked = $true; Note = 'already forwarded in the router''s own settings, but not to this PC as far as IRL Homekit can tell (another PC or device may have it)' }
     }
     $why = switch ($a.Error) { { $_ -in '606', '401', '501' } { 'the router refused (it may only allow this for some devices)' }
         '724' { 'the router needs the same inside and outside port' } default { "the router refused (error $($a.Error))" } }
@@ -248,8 +256,12 @@ if (-not $state.method) {
         $state.ok = $true
         $names = @($manual | ForEach-Object { "$($_.proto) $($_.port)" })
         $list = if ($names.Count -gt 1) { ($names[0..($names.Count - 2)] -join ', ') + " and $($names[-1])" } else { $names[0] }
-        $state.message = "Router ports ready ($($state.method)$(if ($state.router) { ", $($state.router)" })): $($state.ports.Count - $manual.Count) opened automatically; $list " +
-            $(if (@($manual | Where-Object { $_.unchecked })) { "are forwarded in the router's own settings (make sure $(if ($names.Count -gt 1) { 'they point' } else { 'it points' }) at this PC, $lan)." }
+        $unchecked = @($manual | Where-Object { $_.unchecked })
+        # The router says those ports are taken but won't say by whom, and the connection test didn't come back to
+        # this PC. Only one PC on a network can have 80 and 443, so say so instead of calling it ready.
+        if ($unchecked) { $state.problem = 'unverified' }
+        $state.message = "Router ports ($($state.method)$(if ($state.router) { ", $($state.router)" })): $($state.ports.Count - $manual.Count) opened automatically; $list " +
+            $(if ($unchecked) { "$(if ($names.Count -gt 1) { 'are' } else { 'is' }) already forwarded on your router, but IRL Homekit can't tell whether $(if ($names.Count -gt 1) { 'they lead' } else { 'it leads' }) to this PC ($lan). If another PC or device on your network has $(if ($names.Count -gt 1) { 'them' } else { 'it' }), remote access won't work here: only one PC can have ports 80 and 443. You'll know within a couple of minutes, when the HTTPS certificate either arrives or doesn't (Status says which)." }
               else { "already forwarded to this PC in the router's own settings." }) + $movedNote
     } else {
         $state.ok = $true

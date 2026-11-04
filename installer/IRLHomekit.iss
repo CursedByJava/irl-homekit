@@ -1260,6 +1260,12 @@ begin
     if ResultValue('relayConnected') = 'True' then S := S + ': connected' + NL
     else S := S + ': not connected yet (see below)' + NL;
   end
+  else if (ResultValue('portMapOk') = 'True') and (ResultValue('portMapProblem') = 'unverified') then
+    S := S + NL + 'ROUTER' + NL +
+      '  Ports 80 and 443 are already forwarded on your router, but Setup can''t tell whether they lead to' + NL +
+      '  THIS PC. If another PC or device on your network has them, the dashboard and the QR code won''t work' + NL +
+      '  here: only one PC can have those ports. Check in a couple of minutes with' + NL +
+      '  Start menu > IRL Homekit - Set up remote dashboard, which says whether the certificate arrived.' + NL
   else if ResultValue('portMapOk') = 'True' then
     S := S + NL + 'ROUTER' + NL + '  Ports opened automatically: no port forwarding needed.' + NL
   else

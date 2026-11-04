@@ -17,6 +17,11 @@ is what the built-in update checker reads.
   to scan.
 
 ### Fixed
+- **A second PC on the same network was told its router ports were ready when they weren't.** Only one PC can have
+  ports 80 and 443, and a router that answers "already taken" doesn't say which PC has them. The check connected to
+  your home's internet address and counted any answer as proof, so the other PC's answer looked like success: the
+  install finished happily, no HTTPS certificate ever arrived, and the phone got a dead link. It now confirms the
+  connection comes back to this PC, and says plainly when it can't, both in Setup's last page and in Status.
 - **"Connect my phone" could hand out a QR code for a dead link.** On a PC the internet can't reach yet (the router
   hasn't let ports 80 and 443 through, your provider uses carrier-grade NAT, or another PC on the same network
   already has those ports), the page made a link to an address nothing answers on, and the phone simply failed to
