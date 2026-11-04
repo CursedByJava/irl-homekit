@@ -9,7 +9,7 @@ with `-beta.N` while the app is in beta. The format is based on [Keep a Changelo
 Each release is also published on the [Releases page](https://github.com/CursedByJava/irl-homekit/releases), which
 is what the built-in update checker reads.
 
-## [Unreleased]
+## [1.0.0-beta.22] - 2026-11-04
 
 ### Security
 - **Failed dashboard sign-ins are counted per visitor again.** The limit (five wrong tries, then a fifteen-minute
